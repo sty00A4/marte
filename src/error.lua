@@ -36,7 +36,7 @@ local function expectedNear(token, recvToken, file, start, stop)
     expect("argument #3", file, "file")
     expect("argument #4", start, "position")
     expect("argument #5", stop, "position")
-    return Error("'"..token.."' expected near "..recvToken, file, start, stop)
+    return Error(token.." expected near "..recvToken, file, start, stop)
 end
 
 return { Error=Error, nearSymbol=nearSymbol, expectedNear=expectedNear }

@@ -71,13 +71,30 @@ end
 ---@return table
 local function Table(nodes, start, stop)
     expect("value", nodes, "table")
-    for k, n in pairs do expect("nodes."..k, n, "node") end
+    for k, n in pairs(nodes) do expect("nodes."..k, n, "node") end
     expect("start", start, "position")
     expect("stop", stop, "position")
     return setmetatable(
         { nodes = nodes, start = start, stop = stop, copy = table.copy },
         { __name = "node.table", __tostring = function(self)
             return "({"..table.join(self.nodes, ", ").."})"
+        end }
+    )
+end
+---node.exprlist
+---@param nodes table
+---@param start table
+---@param stop table
+---@return table
+local function ExprList(nodes, start, stop)
+    expect("value", nodes, "table")
+    for k, n in pairs(nodes) do expect("nodes."..k, n, "node") end
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { nodes = nodes, start = start, stop = stop, copy = table.copy },
+        { __name = "node.exprlist", __tostring = function(self)
+            return "("..table.join(self.nodes, ", ")..")"
         end }
     )
 end
@@ -124,13 +141,33 @@ end
 ---@return table
 local function Call(head, args, start, stop)
     expect("head", head, "node")
-    expect("args", args, "node.exprlist")
+    expect("args", args, "node")
     expect("start", start, "position")
     expect("stop", stop, "position")
     return setmetatable(
         { head = head, args = args, start = start, stop = stop, copy = table.copy },
         { __name = "node.call", __tostring = function(self)
-            return "("..tostring(self.head).." "..tostring(self.args)..")"
+            return "(call "..tostring(self.head).." "..tostring(self.args)..")"
+        end }
+    )
+end
+---node.selfCall
+---@param head table
+---@param name table
+---@param args table<table>
+---@param start table
+---@param stop table
+---@return table
+local function SelfCall(head, name, args, start, stop)
+    expect("head", head, "node")
+    expect("name", name, "node.name")
+    expect("args", args, "node")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { head = head, name = name, args = args, start = start, stop = stop, copy = table.copy },
+        { __name = "node.call", __tostring = function(self)
+            return "(selfcall "..tostring(self.head).." : "..tostring(self.name).." "..tostring(self.args)..")"
         end }
     )
 end
@@ -195,8 +232,8 @@ local function parse(tokens, file)
         end
         return left
     end
-    local chunk, body, stat, expr, negate, logic, comp, arith, term, power, factor, call, field, atom, var,
-    prefixexpr
+    local chunk, body, stat, expr, negate, logic, comp, arith, term, power, factor, call, field, atom,
+    exprlist
     chunk = function()
         local start, stop = token.start:copy(), token.stop:copy()
         local nodes = {}
@@ -210,6 +247,20 @@ local function parse(tokens, file)
     end
     stat = function() return expr() end -- todo stat
     expr = function() return negate() end
+    exprlist = function()
+        local start, stop = token.start:copy(), token.stop:copy()
+        local nodes = {}
+        local node, err = expr() if err then return nil, err end
+        table.insert(nodes, node)
+        while token.type == "," do
+            advance()
+            node, err = expr() if err then return nil, err end
+            stop = node.stop:copy()
+            table.insert(nodes, node)
+        end
+        if #nodes == 1 then return nodes[1] end
+        return ExprList(nodes, start, stop)
+    end
     negate = function() return logic() end -- todo negate
     logic = function() return binop({"and","or"}, comp) end
     comp = function() return binop({"==","~=","<",">","<=",">="}, arith) end
@@ -217,7 +268,35 @@ local function parse(tokens, file)
     term = function() return binop({"*","/","//","%"}, power) end
     power = function() return binop({"^"}, factor) end
     factor = function() return call() end -- todo factor
-    call = function() return field() end -- todo call
+    call = function()
+        local head, err = field() if err then return nil, err end
+        if token.type == ":" then
+            advance()
+            if token.type ~= "name" then return nil, error.expectedNear("name", token.type, file, token.start, token.stop) end
+            local name = Name(token.value, token.start:copy(), token.stop:copy())
+            advance()
+            if token.type ~= "(" then
+                return nil, error.expectedNear("'('", token.type, file, token.start, token.stop)
+            end
+            advance()
+            local args args, err = exprlist() if err then return nil, err end
+            if token.type ~= ")" then
+                return nil, error.expectedNear("')'", token.type, file, token.start, token.stop)
+            end
+            advance()
+            head = SelfCall(head, name, args, head.start:copy(), args.stop:copy())
+        end
+        while token.type == "(" do
+            advance()
+            local args args, err = exprlist() if err then return nil, err end
+            if token.type ~= ")" then
+                return nil, error.expectedNear("')'", token.type, file, token.start, token.stop)
+            end
+            advance()
+            head = Call(head, args, head.start:copy(), args.stop:copy())
+        end
+        return head
+    end -- todo call
     field = function()
         local head, err = atom() if err then return nil, err end
         while token.type == "." do
@@ -229,7 +308,7 @@ local function parse(tokens, file)
             advance()
             local field_ field_, err = expr() if err then return nil, err end
             if token.type ~= "]" then
-                return nil, error.expectedNear("]", token.type, file, token.start, token.stop)
+                return nil, error.expectedNear("']'", token.type, file, token.start, token.stop)
             end
             advance()
             head = Field(head, field_, head.start:copy(), field_.stop:copy())
