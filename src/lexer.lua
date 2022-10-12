@@ -6,21 +6,23 @@ local function File(path, text)
     expect("argument #1", path, "string")
     expect("argument #2", text, "string")
     return setmetatable(
-        { path = path, text = text },
-        { __name = "mr.file" }
+        {
+            path = path, text = text, copy = table.copy,
+            sub = function(self, start, stop) return self.text:sub(start.idx, stop.idx) end
+        },
+        { __name = "file" }
     )
 end
 ---@param idx number
 ---@param ln number
 ---@param col number
----@param file table
 local function Position(idx, ln, col)
     expect("argument #1", idx, "number")
     expect("argument #2", ln, "number")
     expect("argument #3", col, "number")
     return setmetatable(
-        { idx = idx, ln = ln, col = col },
-        { __name = "mr.position" }
+        { idx = idx, ln = ln, col = col, copy = table.copy },
+        { __name = "position" }
     )
 end
 ---@param type string
@@ -28,11 +30,11 @@ end
 ---@param stop table
 local function Token(type, value, start, stop)
     expect("argument #1", type, "string")
-    expect("argument #3", start, "mr.position")
-    expect("argument #4", stop, "mr.position")
+    expect("argument #3", start, "position")
+    expect("argument #4", stop, "position")
     return setmetatable(
-        { type = type, value = value, start = start, stop = stop },
-        { __name = "mr.token", __tostring = function (self)
+        { type = type, value = value, start = start, stop = stop, copy = table.copy },
+        { __name = "token", __tostring = function (self)
             if self.value then return "["..self.type..":"..self.value.."]" else return "["..self.type.."]" end
         end }
     )
@@ -50,7 +52,7 @@ local symbols = {
 ---@param file table
 ---@return table|nil, table|nil
 local function lex(file)
-    expect("argument #1", file, "mr.file")
+    expect("argument #1", file, "file")
     local tokens = {}
     local char = ""
     local idx = 0
@@ -60,12 +62,6 @@ local function lex(file)
         idx = idx + 1
         col = col + 1
         if char == "\n" then ln = ln + 1 col = 1 end
-        char = file.text:sub(idx,idx)
-    end
-    local function reverse()
-        idx = idx - 1
-        col = col - 1
-        if char == "\n" then ln = ln - 1 col = 1 end
         char = file.text:sub(idx,idx)
     end
     advance()
@@ -84,8 +80,8 @@ local function lex(file)
             if table.contains(keywords, word) then
                 table.insert(tokens, Token(word, nil, start, stop))
             else
-                if word:sub(1,1) == "_" and #word > 1 then word = "_" + word end
-                table.insert(tokens, Token("id", word, start, stop))
+                if word:sub(1,2) == "__" and #word > 1 then word = "_" + word end
+                table.insert(tokens, Token("name", word, start, stop))
             end
         elseif table.contains(string.digits, char) then
             local start, stop = Position(idx, ln, col), Position(idx, ln, col)
@@ -141,6 +137,7 @@ local function lex(file)
             return nil, error.nearSymbol(char, file, Position(idx, ln, col), Position(idx, ln, col))
         end
     end
+    table.insert(tokens, Token("<eof>", nil, Position(idx, ln, col), Position(idx, ln, col)))
     return tokens
 end
 

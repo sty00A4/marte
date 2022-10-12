@@ -1,0 +1,9 @@
+export meta Person(name: string , age: number)
+	name = name
+	age = age
+	function greet(self: Person): string
+		return "Hello! My name is "..self.name.." and I'm "..tostring(self.age).." years old"
+	end
+	setter name(self: Person, v: string) self.name = v end
+	setter age(self: Person, v: number) self.age = v end
+end

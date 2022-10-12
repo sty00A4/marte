@@ -9,6 +9,8 @@ string.split = function(s, sep)
             temp = ""
         else temp = temp .. s:sub(i,i) end
     end
+    if #temp > 0 then table.insert(t, temp) end
+    return t
 end
 ---@param t table
 table.contains = function(t, e)
@@ -34,6 +36,12 @@ table.copy = function(t)
     if metatype(t) ~= "table" then return t end
     local newT = {}
     for k, v in pairs(t) do newT[k] = table.copy(v) end
+    local meta = getmetatable(t)
+    if meta then
+        local newMetaT = {}
+        for k, v in pairs(meta) do newMetaT[k] = table.copy(v) end
+        return setmetatable(newT, newMetaT)
+    end
     return newT
 end
 ---@param t table
@@ -46,10 +54,32 @@ function metatype(object)
     end
     return type(object)
 end
+---checks for metatype paths with `.` if any of the `...` metatypes are headers of the `value` object's metatype:
+---`a.b.c` would match with `a.b.c`, `a.b` and also just `a`, but not `a.e.c`
+---@param type1 string
+---@param type2 string
+---@return boolean
+function metaequal(type1, type2)
+    local match = true
+    local type1_path = type1:split(".")
+    local type2_path = type2:split(".")
+    for i = 1, math.min(#type1_path, #type2_path) do
+        if type2_path[i] ~= type1_path[i] then match = false break end
+    end
+    return match
+end
+---throws an error if the `value` object's metatype doesn't match any in `...`.
+---Also checks for metatype paths with `.` if any of the `...` metatypes are headers of the `value` object's metatype:
+---`a.b.c` would match with `a.b.c`, `a.b` and also just `a`, but not `a.e.c`
 ---@param label string
+---@param ... string
 function expect(label, value, ...)
     local types = {...}
-    if not table.contains(types, metatype(value)) then error("expected "..label.." to be of type "..table.join(types, "|")..", got "..metatype(value), 3) end
+    local typ = metatype(value)
+    for _, t in pairs(types) do
+        if metaequal(typ, t) then return end
+    end
+    error("expected "..label.." to be of type "..table.join(types, "|")..", not "..typ, 3)
 end
 string.letters = {
     "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t",
