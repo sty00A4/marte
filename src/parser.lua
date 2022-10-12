@@ -98,6 +98,22 @@ local function ExprList(nodes, start, stop)
         end }
     )
 end
+---node.expr
+---@param node table
+---@param start table
+---@param stop table
+---@return table
+local function Expr(node, start, stop)
+    expect("value", node, "node")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { node = node, start = start, stop = stop, copy = table.copy },
+        { __name = "node.expr", __tostring = function(self)
+            return tostring(self.node)
+        end }
+    )
+end
 
 ---node.name
 ---@param name string
@@ -322,6 +338,17 @@ local function parse(tokens, file)
         if token.type == "boolean" then advance() return Boolean(token_.value, token_.start:copy(), token_.stop:copy()) end
         if token.type == "nil" then advance() return Nil(token_.start:copy(), token_.stop:copy()) end
         if token.type == "name" then advance() return Name(token_.value, token_.start:copy(), token_.stop:copy()) end
+        if token.type == "(" then
+            local start = token.start:copy()
+            advance()
+            local node, err = expr() if err then return nil, err end
+            if token.type ~= ")" then
+                return nil, error.expectedNear("')'", token.type, file, token.start, token.stop)
+            end
+            local stop = token.stop:copy()
+            advance()
+            return Expr(node, start, stop)
+        end
         return nil, error.nearSymbol(file:sub(token.start, token.stop), file, token.start:copy(), token.stop:copy())
     end
     return chunk()
