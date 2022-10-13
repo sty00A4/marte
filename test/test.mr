@@ -1,1 +1,1 @@
-for i = 1, 10 do print(i) end
+function name(a: string) print(a) end
