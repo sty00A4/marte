@@ -400,6 +400,24 @@ local function While(cond, node, start, stop)
         end}
     )
 end
+---node.repeat
+---@param cond table
+---@param node table
+---@param start table
+---@param stop table
+---@return table
+local function Repeat(cond, node, start, stop)
+    expect("cond", cond, "node")
+    expect("node", node, "node")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { cond = cond, node = node, start = start, stop = stop, copy = table.copy },
+        { __name = "node.repeat", __tostring = function(self)
+            return "(repeat "..tostring(self.node).." until "..tostring(self.cond)..")"
+        end}
+    )
+end
 ---node.do
 ---@param node table
 ---@param start table
@@ -553,6 +571,16 @@ local function parse(tokens, file)
             local stop = token.stop:copy()
             advance()
             return While(cond, node, start, stop)
+        end
+        if token.type == "repeat" then
+            local start = token.start:copy()
+            advance()
+            local cond, node, err
+            node, err = body({"until"}) if err then return nil, err end
+            advance()
+            cond, err = expr() if err then return nil, err end
+            local stop = cond.stop:copy()
+            return Repeat(cond, node, start, stop)
         end
         if token.type == "do" then
             local start = token.start:copy()
