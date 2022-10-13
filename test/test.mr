@@ -1,1 +1,2 @@
-self.name = "sty"
+local name = "sty"
+print(name)
