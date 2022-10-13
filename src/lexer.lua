@@ -42,7 +42,8 @@ end
 
 local keywords = {
     "and", "break", "do", "else", "elseif", "end", "for", "function", "if",
-    "in", "local", "not", "or", "repeat", "return", "then", "until", "while"
+    "in", "local", "not", "or", "repeat", "return", "then", "until", "while",
+    "meta", "export", "setter", "getter", "metamethod"
 }
 local symbols = {
     "+", "-", "*", "/", "%", "^", "#", "==", "~=", "<=", ">=", "<", ">", "=",
@@ -80,7 +81,7 @@ local function lex(file)
             if table.contains(keywords, word) then
                 table.insert(tokens, Token(word, nil, start, stop))
             else
-                if word:sub(1,2) == "__" and #word > 1 then word = "_" .. word end
+                if word:sub(#word-1,#word) == "_L" then word = "_" .. word end
                 table.insert(tokens, Token("name", word, start, stop))
             end
         elseif table.contains(string.digits, char) then

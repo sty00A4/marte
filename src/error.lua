@@ -18,7 +18,7 @@ end
 ---@param file table
 ---@param start table
 ---@param stop table
-local function nearSymbol(char, file, start, stop)
+local function unexpectedSymbol(char, file, start, stop)
     expect("argument #1", char, "string")
     expect("argument #2", file, "file")
     expect("argument #3", start, "position")
@@ -30,7 +30,7 @@ end
 ---@param file table
 ---@param start table
 ---@param stop table
-local function expectedNear(token, recvToken, file, start, stop)
+local function expectedSymbol(token, recvToken, file, start, stop)
     expect("argument #1", token, "string")
     expect("argument #2", recvToken, "string")
     expect("argument #3", file, "file")
@@ -39,4 +39,4 @@ local function expectedNear(token, recvToken, file, start, stop)
     return Error(token.." expected near "..recvToken, file, start, stop)
 end
 
-return { Error=Error, nearSymbol=nearSymbol, expectedNear=expectedNear }
+return { Error=Error, unexpectedSymbol=unexpectedSymbol, expectedSymbol=expectedSymbol }

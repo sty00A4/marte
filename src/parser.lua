@@ -87,13 +87,30 @@ end
 ---@param stop table
 ---@return table
 local function ExprList(nodes, start, stop)
-    expect("value", nodes, "table")
+    expect("nodes", nodes, "table")
     for k, n in pairs(nodes) do expect("nodes."..k, n, "node") end
     expect("start", start, "position")
     expect("stop", stop, "position")
     return setmetatable(
         { nodes = nodes, start = start, stop = stop, copy = table.copy },
         { __name = "node.exprlist", __tostring = function(self)
+            return "("..table.join(self.nodes, ", ")..")"
+        end }
+    )
+end
+---node.varlist
+---@param nodes table
+---@param start table
+---@param stop table
+---@return table
+local function VarList(nodes, start, stop)
+    expect("nodes", nodes, "table")
+    for k, n in pairs(nodes) do expect("nodes."..k, n, "node.name", "node.field") end
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { nodes = nodes, start = start, stop = stop, copy = table.copy },
+        { __name = "node.varlist", __tostring = function(self)
             return "("..table.join(self.nodes, ", ")..")"
         end }
     )
@@ -260,6 +277,27 @@ local function UnaryRight(op, node, start, stop)
     )
 end
 
+---node.assign
+---@param vars table
+---@param exprs table
+---@param scoping string
+---@param start table
+---@param stop table
+---@return table
+local function Assign(vars, exprs, scoping, start, stop)
+    expect("vars", vars, "node")
+    expect("exprs", exprs, "node")
+    expect("scoping", scoping, "string")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { vars = vars, exprs = exprs, scoping = scoping, start = start, stop = stop, copy = table.copy },
+        { __name = "node.assign", __tostring = function(self)
+            return "("..self.scoping.." "..tostring(self.vars).." = "..tostring(self.exprs)..")"
+        end }
+    )
+end
+
 ---parses tokens from the lexer
 ---@param tokens table
 ---@param file table
@@ -285,7 +323,7 @@ local function parse(tokens, file)
         return left
     end
     local chunk, body, stat, expr, negate, logic, comp, arith, term, power, factor, call, field, atom,
-    exprlist
+    exprlist, varlist
     chunk = function()
         local start, stop = token.start:copy(), token.stop:copy()
         local nodes = {}
@@ -297,7 +335,34 @@ local function parse(tokens, file)
         if #nodes == 1 then return nodes[1] end
         return Body(nodes, start, stop)
     end
-    stat = function() return expr() end -- todo stat
+    stat = function(prefix)
+        if prefix == nil then prefix = true end
+        if (token.type == "local" or token.type == "export") and prefix then
+            local scoping = token.type
+            advance()
+            local subnode, err = stat(false) if err then return nil, err end
+            if metatype(subnode) ~= "node.assign" then
+                return nil, error.unexpectedSymbol(file:sub(subnode.start, subnode.stop), file, subnode.start, subnode.stop)
+            end
+            subnode.scoping = scoping
+            return subnode
+        end
+        local idx_ = idx
+        local node, err = call() if err then return nil, err end
+        if metatype(node) == "node.call" or metatype(node) == "node.selfCall" then
+            return node
+        end
+        if metatype(node) == "node.name" or metatype(node) == "node.field" then
+            idx = idx_ token = tokens[idx]
+            local vars vars, err = varlist() if err then return nil, err end
+            if token.type == "=" then
+                advance()
+                local expr_ expr_, err = exprlist() if err then return nil, err end
+                return Assign(vars, expr_, "global", node.start:copy(), expr_.stop:copy())
+            end
+        end
+        return nil, error.unexpectedSymbol(file:sub(node.start, node.stop), file, node.start, node.stop)
+    end
     expr = function() return negate() end
     exprlist = function()
         local start, stop = token.start:copy(), token.stop:copy()
@@ -312,6 +377,20 @@ local function parse(tokens, file)
         end
         if #nodes == 1 then return nodes[1] end
         return ExprList(nodes, start, stop)
+    end
+    varlist = function()
+        local start, stop = token.start:copy(), token.stop:copy()
+        local nodes = {}
+        local node, err = field() if err then return nil, err end
+        table.insert(nodes, node)
+        while token.type == "," do
+            advance()
+            node, err = field() if err then return nil, err end
+            stop = node.stop:copy()
+            table.insert(nodes, node)
+        end
+        if #nodes == 1 then return nodes[1] end
+        return VarList(nodes, start, stop)
     end
     negate = function()
         if token.type == "not" then
@@ -338,18 +417,18 @@ local function parse(tokens, file)
     end
     call = function()
         local head, err = field() if err then return nil, err end
-        if token.type == ":" then
+        while token.type == ":" do
             advance()
-            if token.type ~= "name" then return nil, error.expectedNear("name", token.type, file, token.start, token.stop) end
+            if token.type ~= "name" then return nil, error.expectedSymbol("name", token.type, file, token.start, token.stop) end
             local name = Name(token.value, token.start:copy(), token.stop:copy())
             advance()
             if token.type ~= "(" then
-                return nil, error.expectedNear("'('", token.type, file, token.start, token.stop)
+                return nil, error.expectedSymbol("'('", token.type, file, token.start, token.stop)
             end
             advance()
             local args args, err = exprlist() if err then return nil, err end
             if token.type ~= ")" then
-                return nil, error.expectedNear("')'", token.type, file, token.start, token.stop)
+                return nil, error.expectedSymbol("')'", token.type, file, token.start, token.stop)
             end
             advance()
             head = SelfCall(head, name, args, head.start:copy(), args.stop:copy())
@@ -358,7 +437,7 @@ local function parse(tokens, file)
             advance()
             local args args, err = exprlist() if err then return nil, err end
             if token.type ~= ")" then
-                return nil, error.expectedNear("')'", token.type, file, token.start, token.stop)
+                return nil, error.expectedSymbol("')'", token.type, file, token.start, token.stop)
             end
             advance()
             head = Call(head, args, head.start:copy(), args.stop:copy())
@@ -376,7 +455,7 @@ local function parse(tokens, file)
             advance()
             local field_ field_, err = expr() if err then return nil, err end
             if token.type ~= "]" then
-                return nil, error.expectedNear("']'", token.type, file, token.start, token.stop)
+                return nil, error.expectedSymbol("']'", token.type, file, token.start, token.stop)
             end
             advance()
             head = Field(head, field_, head.start:copy(), field_.stop:copy())
@@ -395,13 +474,13 @@ local function parse(tokens, file)
             advance()
             local node, err = expr() if err then return nil, err end
             if token.type ~= ")" then
-                return nil, error.expectedNear("')'", token.type, file, token.start, token.stop)
+                return nil, error.expectedSymbol("')'", token.type, file, token.start, token.stop)
             end
             local stop = token.stop:copy()
             advance()
             return Expr(node, start, stop)
         end
-        return nil, error.nearSymbol(file:sub(token.start, token.stop), file, token.start:copy(), token.stop:copy())
+        return nil, error.unexpectedSymbol(file:sub(token.start, token.stop), file, token.start:copy(), token.stop:copy())
     end
     return chunk()
 end
