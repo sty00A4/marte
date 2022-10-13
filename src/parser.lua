@@ -211,15 +211,51 @@ end
 ---@param stop table
 ---@return table
 local function Binary(op, left, right, start, stop)
-    expect("nodes", op, "token")
-    expect("nodes", left, "node")
-    expect("nodes", right, "node")
+    expect("op", op, "token")
+    expect("left", left, "node")
+    expect("right", right, "node")
     expect("start", start, "position")
     expect("stop", stop, "position")
     return setmetatable(
         { op = op, left = left, right = right, start = start, stop = stop, copy = table.copy },
         { __name = "node.binary", __tostring = function(self)
             return "("..tostring(self.left).." "..op.type.." "..tostring(self.right)..")"
+        end }
+    )
+end
+---node.unaryLeft
+---@param op table
+---@param node table
+---@param start table
+---@param stop table
+---@return table
+local function UnaryLeft(op, node, start, stop)
+    expect("op", op, "token")
+    expect("node", node, "node")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { op = op, node = node, start = start, stop = stop, copy = table.copy },
+        { __name = "node.unaryLeft", __tostring = function(self)
+            return "("..op.type.." "..tostring(self.node)..")"
+        end }
+    )
+end
+---node.unaryRight
+---@param op table
+---@param node table
+---@param start table
+---@param stop table
+---@return table
+local function UnaryRight(op, node, start, stop)
+    expect("op", op, "token")
+    expect("node", node, "node")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { op = op, node = node, start = start, stop = stop, copy = table.copy },
+        { __name = "node.unaryRight", __tostring = function(self)
+            return "("..tostring(self.node).." "..self.op.type..")"
         end }
     )
 end
@@ -277,13 +313,29 @@ local function parse(tokens, file)
         if #nodes == 1 then return nodes[1] end
         return ExprList(nodes, start, stop)
     end
-    negate = function() return logic() end -- todo negate
+    negate = function()
+        if token.type == "not" then
+            local op = token:copy()
+            advance()
+            local node, err = negate() if err then return nil, err end
+            return UnaryLeft(op, node, op.start:copy(), node.stop:copy())
+        end
+        return logic()
+    end
     logic = function() return binop({"and","or"}, comp) end
     comp = function() return binop({"==","~=","<",">","<=",">="}, arith) end
     arith = function() return binop({"+","-"}, term) end
     term = function() return binop({"*","/","//","%"}, power) end
     power = function() return binop({"^"}, factor) end
-    factor = function() return call() end -- todo factor
+    factor = function()
+        if token.type == "-" then
+            local op = token:copy()
+            advance()
+            local node, err = factor() if err then return nil, err end
+            return UnaryLeft(op, node, op.start:copy(), node.stop:copy())
+        end
+        return call()
+    end
     call = function()
         local head, err = field() if err then return nil, err end
         if token.type == ":" then
@@ -312,7 +364,7 @@ local function parse(tokens, file)
             head = Call(head, args, head.start:copy(), args.stop:copy())
         end
         return head
-    end -- todo call
+    end
     field = function()
         local head, err = atom() if err then return nil, err end
         while token.type == "." do
