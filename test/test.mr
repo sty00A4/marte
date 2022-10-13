@@ -1,1 +1,4 @@
-local name: string, age: number = "sty", 18
+meta Person(name: string, age: number)
+    name: string = name
+    age: number = age
+end

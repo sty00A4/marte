@@ -285,7 +285,7 @@ end
 ---@param stop table
 ---@return table
 local function Assign(vars, exprs, scoping, start, stop)
-    expect("vars", vars, "node.params")
+    expect("vars", vars, "node.params", "node.param")
     expect("exprs", exprs, "node")
     expect("scoping", scoping, "string")
     expect("start", start, "position")
@@ -490,7 +490,7 @@ end
 ---@return table
 local function Function(funcname, params, returnType, node, scoping, start, stop)
     expect("funcname", funcname, "node.name", "node.field")
-    expect("params", params, "node")
+    expect("params", params, "node.params", "node.param")
     expect("returnType", returnType, "node", "nil")
     expect("node", node, "node")
     expect("scoping", scoping, "string")
@@ -507,6 +507,32 @@ local function Function(funcname, params, returnType, node, scoping, start, stop
         end}
     )
 end
+---node.meta
+---@param name table
+---@param params table
+---@param node table
+---@param scoping string
+---@param start table
+---@param stop table
+---@return table
+local function Meta(name, params, node, scoping, start, stop)
+    expect("name", name, "node.name", "node.field")
+    expect("params", params, "node.params", "node.param")
+    expect("node", node, "node")
+    expect("scoping", scoping, "string")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        {
+            name = name, params = params, node = node, scoping = scoping,
+            start = start, stop = stop, copy = table.copy
+        },
+        { __name = "node.meta", __tostring = function(self)
+            return "(meta "..tostring(self.name).." "..tostring(self.params).." "
+                ..tostring(self.node).." end)"
+        end}
+    )
+end
 ---node.metamethod
 ---@param funcname table
 ---@param params table
@@ -518,7 +544,7 @@ end
 ---@return table
 local function Metamethod(funcname, params, returnType, node, scoping, start, stop)
     expect("funcname", funcname, "node.name", "node.field")
-    expect("params", params, "node")
+    expect("params", params, "node.params", "node.param")
     expect("returnType", returnType, "node", "nil")
     expect("node", node, "node")
     expect("scoping", scoping, "string")
@@ -544,7 +570,7 @@ end
 ---@return table
 local function Setter(name, params, node, start, stop)
     expect("name", name, "node.name", "node.field")
-    expect("params", params, "node")
+    expect("params", params, "node.params", "node.param")
     expect("node", node, "node")
     expect("start", start, "position")
     expect("stop", stop, "position")
@@ -568,7 +594,7 @@ end
 ---@return table
 local function Getter(name, params, node, start, stop)
     expect("name", name, "node.name", "node.field")
-    expect("params", params, "node")
+    expect("params", params, "node.params", "node.param")
     expect("node", node, "node")
     expect("start", start, "position")
     expect("stop", stop, "position")
@@ -830,10 +856,33 @@ local function parse(tokens, file)
                 return nil, error.expectedSymbol("')'", token.type, file, token.start, token.stop)
             end
             advance()
+            if token.type == ":" then
+                advance()
+                returnType, err = atom() if err then return nil, err end
+            end
             node, err = body({"end"}) if err then return nil, err end
             local stop = token.stop:copy()
             advance()
             return Function(funcname, params_, returnType, node, "global", start, stop)
+        end
+        if token.type == "meta" then
+            local start = token.start:copy()
+            advance()
+            local name, params_, node, err
+            name, err = field() if err then return nil, err end
+            if token.type ~= "(" then
+                return nil, error.expectedSymbol("'('", token.type, file, token.start, token.stop)
+            end
+            advance()
+            params_, err = params() if err then return nil, err end
+            if token.type ~= ")" then
+                return nil, error.expectedSymbol("')'", token.type, file, token.start, token.stop)
+            end
+            advance()
+            node, err = body({"end"}) if err then return nil, err end
+            local stop = token.stop:copy()
+            advance()
+            return Meta(name, params_, node, "global", start, stop)
         end
         if token.type == "metamethod" then
             local start = token.start:copy()

@@ -79,7 +79,7 @@ function expect(label, value, ...)
     for _, t in pairs(types) do
         if metaequal(typ, t) then return end
     end
-    error("expected "..label.." to be of type "..table.join(types, "|")..", not "..typ, 3)
+    error("expected "..label.." to be of type "..table.join(types, "|")..", not "..typ, 2)
 end
 string.letters = {
     "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t",
