@@ -8,7 +8,7 @@ local function File(path, text)
     return setmetatable(
         {
             path = path, text = text, copy = table.copy,
-            sub = function(self, start, stop) return self.text:sub(start.idx, stop.idx+1) end
+            sub = function(self, start, stop) return self.text:sub(start.idx, stop.idx) end
         },
         { __name = "file" }
     )

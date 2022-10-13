@@ -285,7 +285,7 @@ end
 ---@param stop table
 ---@return table
 local function Assign(vars, exprs, scoping, start, stop)
-    expect("vars", vars, "node.params", "node.param")
+    expect("vars", vars, "node.params", "node.param", "node.name", "node.field")
     expect("exprs", exprs, "node")
     expect("scoping", scoping, "string")
     expect("start", start, "position")
@@ -669,7 +669,7 @@ local function parse(tokens, file)
         end
         return left
     end
-    local chunk, body, stat, expr, negate, logic, comp, arith, term, power, factor, call, field, atom,
+    local chunk, body, stat, expr, concat, negate, logic, comp, arith, term, power, factor, call, field, atom,
     exprlist, varlist, params, param
     chunk = function()
         local start, stop = token.start:copy(), token.stop:copy()
@@ -949,7 +949,7 @@ local function parse(tokens, file)
         end
         if metatype(node) == "node.name" or metatype(node) == "node.field" then
             idx = idx_ token = tokens[idx]
-            local vars vars, err = params() if err then return nil, err end
+            local vars vars, err = varlist() if err then return nil, err end
             if token.type == "=" then
                 advance()
                 local expr_ expr_, err = exprlist() if err then return nil, err end
@@ -958,7 +958,7 @@ local function parse(tokens, file)
         end
         return nil, error.unexpectedSymbol(file:sub(node.start, node.stop), file, node.start, node.stop)
     end
-    expr = function() return negate() end
+    expr = function() return concat() end
     exprlist = function()
         local start, stop = token.start:copy(), token.stop:copy()
         local nodes = {}
@@ -981,6 +981,11 @@ local function parse(tokens, file)
         while token.type == "," do
             advance()
             node, err = field() if err then return nil, err end
+            if token.type == ":" then
+                advance()
+                local type_ type_, err = atom() if err then return nil, err end
+                node = Param(node, type_, node.start:copy(), type_.stop:copy())
+            end
             stop = node.stop:copy()
             table.insert(nodes, node)
         end
@@ -1014,6 +1019,7 @@ local function parse(tokens, file)
         end
         return Param(name, nil, name.start:copy(), name.stop:copy())
     end
+    concat = function() return binop({".."}, negate) end
     negate = function()
         if token.type == "not" then
             local op = token:copy()
