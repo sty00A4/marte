@@ -8,7 +8,7 @@ local function File(path, text)
     return setmetatable(
         {
             path = path, text = text, copy = table.copy,
-            sub = function(self, start, stop) return self.text:sub(start.idx, stop.idx) end
+            sub = function(self, start, stop) return self.text:sub(start.idx, stop.idx+1) end
         },
         { __name = "file" }
     )
@@ -142,4 +142,4 @@ local function lex(file)
     return tokens
 end
 
-return { File=File, Position=Position, Token=Token, lex=lex }
+return { File=File, Position=Position, Token=Token, lex=lex, keywords=keywords, symbols=symbols }

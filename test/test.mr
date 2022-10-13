@@ -1,1 +1,1 @@
-function name(a: string) print(a) end
+local name: string, age: number = "sty", 18

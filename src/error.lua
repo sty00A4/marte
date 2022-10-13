@@ -10,7 +10,7 @@ local function Error(detail, file, start, stop)
     return setmetatable(
         { detail = detail, file = file, start = start, stop = stop },
         { __name = "error", __tostring = function(self)
-            return file.path..":"..tostring(start.ln)..": "..detail
+            return "[ERROR] "..file.path..":"..tostring(start.ln)..": "..detail
         end }
     )
 end
@@ -23,7 +23,7 @@ local function unexpectedSymbol(char, file, start, stop)
     expect("argument #2", file, "file")
     expect("argument #3", start, "position")
     expect("argument #4", stop, "position")
-    return Error("unexpected symbol near '"..char.."'", file, start, stop)
+    return Error("unexpected '"..char.."'", file, start, stop)
 end
 ---@param token string
 ---@param recvToken string
@@ -36,7 +36,7 @@ local function expectedSymbol(token, recvToken, file, start, stop)
     expect("argument #3", file, "file")
     expect("argument #4", start, "position")
     expect("argument #5", stop, "position")
-    return Error(token.." expected near "..recvToken, file, start, stop)
+    return Error(token.." expected, but got "..recvToken, file, start, stop)
 end
 
 return { Error=Error, unexpectedSymbol=unexpectedSymbol, expectedSymbol=expectedSymbol }
