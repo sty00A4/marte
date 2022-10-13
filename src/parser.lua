@@ -507,6 +507,82 @@ local function Function(funcname, params, returnType, node, scoping, start, stop
         end}
     )
 end
+---node.metamethod
+---@param funcname table
+---@param params table
+---@param returnType table
+---@param node table
+---@param scoping string
+---@param start table
+---@param stop table
+---@return table
+local function Metamethod(funcname, params, returnType, node, scoping, start, stop)
+    expect("funcname", funcname, "node.name", "node.field")
+    expect("params", params, "node")
+    expect("returnType", returnType, "node", "nil")
+    expect("node", node, "node")
+    expect("scoping", scoping, "string")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        {
+            funcname = funcname, params = params, returnType = returnType, node = node, scoping = scoping,
+            start = start, stop = stop, copy = table.copy
+        },
+        { __name = "node.metamethod", __tostring = function(self)
+            return "(metamethod "..tostring(self.funcname).." "..tostring(self.params).." : "..tostring(self.returnType).." "
+                ..tostring(self.node).." end)"
+        end}
+    )
+end
+---node.setter
+---@param name table
+---@param params table
+---@param node table
+---@param start table
+---@param stop table
+---@return table
+local function Setter(name, params, node, start, stop)
+    expect("name", name, "node.name", "node.field")
+    expect("params", params, "node")
+    expect("node", node, "node")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        {
+            name = name, params = params, node = node,
+            start = start, stop = stop, copy = table.copy
+        },
+        { __name = "node.setter", __tostring = function(self)
+            return "(setter "..tostring(self.name).." "..tostring(self.params).." "
+                ..tostring(self.node).." end)"
+        end}
+    )
+end
+---node.getter
+---@param name table
+---@param params table
+---@param node table
+---@param start table
+---@param stop table
+---@return table
+local function Getter(name, params, node, start, stop)
+    expect("name", name, "node.name", "node.field")
+    expect("params", params, "node")
+    expect("node", node, "node")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        {
+            name = name, params = params, node = node,
+            start = start, stop = stop, copy = table.copy
+        },
+        { __name = "node.getter", __tostring = function(self)
+            return "(getter "..tostring(self.name).." "..tostring(self.params).." "
+                ..tostring(self.node).." end)"
+        end}
+    )
+end
 ---node.param
 ---@param name table
 ---@param type_ table
@@ -751,6 +827,39 @@ local function parse(tokens, file)
             local stop = token.stop:copy()
             advance()
             return Function(funcname, params_, returnType, node, "global", start, stop)
+        end
+        if token.type == "metamethod" then
+            local start = token.start:copy()
+            advance()
+            local funcname, params_, returnType, node, err
+            funcname, err = field() if err then return nil, err end
+            params_, err = params() if err then return nil, err end
+            node, err = body({"end"}) if err then return nil, err end
+            local stop = token.stop:copy()
+            advance()
+            return Metamethod(funcname, params_, returnType, node, "global", start, stop)
+        end
+        if token.type == "setter" then
+            local start = token.start:copy()
+            advance()
+            local name, params_, node, err
+            name, err = field() if err then return nil, err end
+            params_, err = params() if err then return nil, err end
+            node, err = body({"end"}) if err then return nil, err end
+            local stop = token.stop:copy()
+            advance()
+            return Setter(name, params_, node, start, stop)
+        end
+        if token.type == "getter" then
+            local start = token.start:copy()
+            advance()
+            local name, params_, node, err
+            name, err = field() if err then return nil, err end
+            params_, err = params() if err then return nil, err end
+            node, err = body({"end"}) if err then return nil, err end
+            local stop = token.stop:copy()
+            advance()
+            return Getter(name, params_, node, start, stop)
         end
         local idx_ = idx
         local node, err = call() if err then return nil, err end
