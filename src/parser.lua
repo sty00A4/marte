@@ -434,6 +434,51 @@ local function Do(node, start, stop)
         end}
     )
 end
+---node.forIn
+---@param vars table
+---@param exprs table
+---@param node table
+---@param start table
+---@param stop table
+---@return table
+local function ForIn(vars, exprs, node, start, stop)
+    expect("vars", vars, "node", "table")
+    expect("exprs", exprs, "node", "table")
+    expect("node", node, "node")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { vars = vars, exprs = exprs, node = node, start = start, stop = stop, copy = table.copy },
+        { __name = "node.forIn", __tostring = function(self)
+            return "(for "..tostring(self.vars).." in "..tostring(self.exprs).." do "..tostring(self.node).." end)"
+        end}
+    )
+end
+---node.for
+---@param vars table
+---@param startn table
+---@param stopn table
+---@param stepn table
+---@param node table
+---@param start table
+---@param stop table
+---@return table
+local function For(vars, startn, stopn, stepn, node, start, stop)
+    expect("vars", vars, "node", "table")
+    expect("startn", startn, "node")
+    expect("stopn", stopn, "node")
+    expect("stepn", stepn, "node", "nil")
+    expect("node", node, "node")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { vars = vars, startn = startn, stopn = stopn, stepn = stepn, node = node, start = start, stop = stop, copy = table.copy },
+        { __name = "node.for", __tostring = function(self)
+            return "(for "..tostring(self.vars).." = "..tostring(self.stopn)..", "..tostring(self.stopn)..", "..tostring(self.stepn)
+            .." do "..tostring(self.node).." end)"
+        end}
+    )
+end
 
 ---parses tokens from the lexer
 ---@param tokens table
@@ -590,6 +635,48 @@ local function parse(tokens, file)
             advance()
             return Do(node, start, stop)
         end
+        if token.type == "for" then
+            local start = token.start:copy()
+            advance()
+            local vars, node, err
+            vars, err = varlist() if err then return nil, err end
+            if token.type == "in" then
+                local exprs
+                advance()
+                exprs, err = exprlist() if err then return nil, err end
+                if token.type ~= "do" then
+                    return nil, error.expectedSymbol("'do'", token.type, file, token.start, token.stop)
+                end
+                advance()
+                node, err = body({"end"}) if err then return nil, err end
+                local stop = token.stop:copy()
+                advance()
+                return ForIn(vars, exprs, node, start, stop)
+            end
+            if token.type == "=" then
+                local startn, stopn, step
+                advance()
+                startn, err = expr() if err then return nil, err end
+                if token.type ~= "," then
+                    return nil, error.expectedSymbol("','", token.type, file, token.start, token.stop)
+                end
+                advance()
+                stopn, err = expr() if err then return nil, err end
+                if token.type == "," then
+                    advance()
+                    step, err = expr() if err then return nil, err end
+                end
+                if token.type ~= "do" then
+                    return nil, error.expectedSymbol("'do'", token.type, file, token.start, token.stop)
+                end
+                advance()
+                node, err = body({"end"}) if err then return nil, err end
+                local stop = token.stop:copy()
+                advance()
+                return For(vars, startn, stopn, step, node, start, stop)
+            end
+            return nil, error.expectedSymbol("'in' or '='", token.type, file, token.start, token.stop)
+        end
         local idx_ = idx
         local node, err = call() if err then return nil, err end
         if metatype(node) == "node.call" or metatype(node) == "node.selfCall" then
@@ -731,5 +818,6 @@ end
 return { parse=parse, node = {
     Number=Number, Boolean=Boolean, String=String, Nil=Nil, Table=Table, ExprList=ExprList, VarList=VarList,
     Expr=Expr, Name=Name, Field=Field, Call=Call, SelfCall=SelfCall, Body=Body, Binary=Binary, UnaryLeft=UnaryLeft,
-    UnaryRight=UnaryRight
+    UnaryRight=UnaryRight, Assign=Assign, Return=Return, Goto=Goto, Label=Label, If=If, While=While, Repeat=Repeat,
+    Do=Do
 } }
