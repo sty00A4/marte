@@ -216,7 +216,7 @@ local function Body(nodes, start, stop)
     return setmetatable(
         { nodes = nodes, start = start, stop = stop, copy = table.copy },
         { __name = "node.body", __tostring = function(self)
-            return "(\n"..table.join(self.nodes, "\n").."\n)"
+            return "(body "..table.join(self.nodes, "; ")..")"
         end }
     )
 end
@@ -297,6 +297,125 @@ local function Assign(vars, exprs, scoping, start, stop)
         end }
     )
 end
+---node.return
+---@param node table
+---@param start table
+---@param stop table
+---@return table
+local function Return(node, start, stop)
+    expect("vars", node, "node")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { node = node, start = start, stop = stop, copy = table.copy },
+        { __name = "node.return", __tostring = function(self)
+            return "(return "..tostring(self.node)..")"
+        end }
+    )
+end
+---node.goto
+---@param node table
+---@param start table
+---@param stop table
+---@return table
+local function Goto(node, start, stop)
+    expect("vars", node, "node.name")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { node = node, start = start, stop = stop, copy = table.copy },
+        { __name = "node.goto", __tostring = function(self)
+            return "(goto "..tostring(self.node)..")"
+        end }
+    )
+end
+---node.label
+---@param node table
+---@param start table
+---@param stop table
+---@return table
+local function Label(node, start, stop)
+    expect("node", node, "node.name")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { node = node, start = start, stop = stop, copy = table.copy },
+        { __name = "node.label", __tostring = function(self)
+            return "(:: "..tostring(self.node).." ::)"
+        end }
+    )
+end
+---node.if
+---@param cond table
+---@param node table
+---@param conds table
+---@param nodes table
+---@param elseNode table
+---@param start table
+---@param stop table
+---@return table
+local function If(cond, node, conds, nodes, elseNode, start, stop)
+    expect("cond", cond, "node")
+    expect("node", node, "node")
+    expect("conds", conds, "table")
+    for k, v in pairs(conds) do expect("conds."..k, v, "node") end
+    expect("nodes", nodes, "table")
+    for k, v in pairs(nodes) do expect("nodes."..k, v, "node") end
+    expect("elseNode", elseNode, "node", "nil")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        {
+            cond = cond, node = node, conds = conds, nodes = nodes, elseNode = elseNode,
+            start = start, stop = stop, copy = table.copy
+        },
+        {
+            __name = "node.if", __tostring = function(self)
+                local s = "(if "..tostring(self.cond).." then "..tostring(self.node)
+                for i = 1, #self.conds do
+                    s = s.." elseif "..tostring(self.conds[i]).." then "..tostring(self.nodes[i])
+                end
+                if self.elseNode then s = s.." else "..tostring(self.elseNode) end
+                s = s.." end)"
+                return s
+            end
+        }
+    )
+end
+---node.while
+---@param cond table
+---@param node table
+---@param start table
+---@param stop table
+---@return table
+local function While(cond, node, start, stop)
+    expect("cond", cond, "node")
+    expect("node", node, "node")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { cond = cond, node = node, start = start, stop = stop, copy = table.copy },
+        { __name = "node.while", __tostring = function(self)
+            return "(while "..tostring(self.cond).." do "..tostring(self.node).." end)"
+        end}
+    )
+end
+---node.do
+---@param node table
+---@param start table
+---@param stop table
+---@return table
+local function Do(node, start, stop)
+    expect("node", node, "node")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { node = node, start = start, stop = stop, copy = table.copy },
+        { __name = "node.do", __tostring = function(self)
+            return "(do "..tostring(self.node).." end)"
+        end}
+    )
+end
 
 ---parses tokens from the lexer
 ---@param tokens table
@@ -323,11 +442,23 @@ local function parse(tokens, file)
         return left
     end
     local chunk, body, stat, expr, negate, logic, comp, arith, term, power, factor, call, field, atom,
-    exprlist, varlist
+    exprlist, varlist, if_body
     chunk = function()
         local start, stop = token.start:copy(), token.stop:copy()
         local nodes = {}
         while token.type ~= "<eof>" do
+            local node, err = stat() if err then return nil, err end
+            stop = node.stop:copy()
+            table.insert(nodes, node)
+        end
+        if #nodes == 1 then return nodes[1] end
+        return Body(nodes, start, stop)
+    end
+    body = function(stopTokens)
+        if stopTokens == nil then stopTokens = {} end
+        local start, stop = token.start:copy(), token.stop:copy()
+        local nodes = {}
+        while not table.contains(stopTokens, token.type) do
             local node, err = stat() if err then return nil, err end
             stop = node.stop:copy()
             table.insert(nodes, node)
@@ -346,6 +477,90 @@ local function parse(tokens, file)
             end
             subnode.scoping = scoping
             return subnode
+        end
+        if token.type == "return" then
+            local start = token.start:copy()
+            advance()
+            local node, err = expr() if err then return nil, err end
+            return Return(node, start, node.stop:copy())
+        end
+        if token.type == "goto" then
+            local start = token.start:copy()
+            advance()
+            if token.type ~= "name" then
+                return nil, error.expectedSymbol("name", token.type, file, token.start, token.stop)
+            end
+            local name = Name(token.value, token.start:copy(), token.stop:copy())
+            advance()
+            return Goto(name, start, name.stop:copy())
+        end
+        if token.type == "::" then
+            local start = token.start:copy()
+            advance()
+            if token.type ~= "name" then
+                return nil, error.expectedSymbol("name", token.type, file, token.start, token.stop)
+            end
+            local name = Name(token.value, token.start:copy(), token.stop:copy())
+            advance()
+            if token.type ~= "::" then
+                return nil, error.expectedSymbol("'::'", token.type, file, token.start, token.stop)
+            end
+            advance()
+            return Label(name, start, name.stop:copy())
+        end
+        if token.type == "if" then
+            local start = token.start:copy()
+            advance()
+            local conds, nodes, cond, node, elseNode, err = {}, {}
+            cond, err = expr() if err then return nil, err end
+            if token.type ~= "then" then
+                return nil, error.expectedSymbol("'then'", token.type, file, token.start, token.stop)
+            end
+            advance()
+            node, err = body({"elseif", "else", "end"}) if err then return nil, err end
+            while token.type == "elseif" do
+                advance()
+                local cond_ cond_, err = expr() if err then return nil, err end
+                table.insert(conds, cond_)
+                if token.type ~= "then" then
+                    return nil, error.expectedSymbol("'then'", token.type, file, token.start, token.stop)
+                end
+                advance()
+                local node_ node_, err = body({"elseif", "else", "end"}) if err then return nil, err end
+                table.insert(nodes, node_)
+            end
+            if token.type == "else" then
+                advance()
+                elseNode, err = body({"end"}) if err then return nil, err end
+            end
+            if token.type ~= "end" then
+                return nil, error.expectedSymbol("'end'", token.type, file, token.start, token.stop)
+            end
+            local stop = token.stop:copy()
+            advance()
+            return If(cond, node, conds, nodes, elseNode, start, stop)
+        end
+        if token.type == "while" then
+            local start = token.start:copy()
+            advance()
+            local cond, node, err
+            cond, err = expr() if err then return nil, err end
+            if token.type ~= "do" then
+                return nil, error.expectedSymbol("'do'", token.type, file, token.start, token.stop)
+            end
+            advance()
+            node, err = body({"end"}) if err then return nil, err end
+            local stop = token.stop:copy()
+            advance()
+            return While(cond, node, start, stop)
+        end
+        if token.type == "do" then
+            local start = token.start:copy()
+            advance()
+            local node, err = body({"end"}) if err then return nil, err end
+            local stop = token.stop:copy()
+            advance()
+            return Do(node, start, stop)
         end
         local idx_ = idx
         local node, err = call() if err then return nil, err end
@@ -485,4 +700,8 @@ local function parse(tokens, file)
     return chunk()
 end
 
-return { parse=parse }
+return { parse=parse, node = {
+    Number=Number, Boolean=Boolean, String=String, Nil=Nil, Table=Table, ExprList=ExprList, VarList=VarList,
+    Expr=Expr, Name=Name, Field=Field, Call=Call, SelfCall=SelfCall, Body=Body, Binary=Binary, UnaryLeft=UnaryLeft,
+    UnaryRight=UnaryRight
+} }
