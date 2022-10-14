@@ -132,7 +132,8 @@ local function compile(file, debug)
     if #context.exports > 0 then
         str = str.."\nreturn { "
         for _, n in ipairs(context.exports) do
-            if metatype(n) == "node.name" or metatype(n) == "node.param" then
+            if metatype(n) == "node.name" or metatype(n) == "node.param" or
+            metatype(n) == "node.function" or metatype(n) == "node.meta" then
                 str = str..n.name.."="..n.name..", "
             end
             if metatype(n) == "node.varlist" then
