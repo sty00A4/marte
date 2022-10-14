@@ -1,2 +1,2 @@
-local name = "sty"
+local name, age = "sty", 18
 print(name)

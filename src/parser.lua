@@ -13,7 +13,7 @@ local function Number(value, start, stop)
     expect("stop", stop, "position")
     return setmetatable(
         { value = value, start = start, stop = stop, copy = table.copy },
-        { __name = "node.name", __tostring = function(self)
+        { __name = "node.number", __tostring = function(self)
             return "("..tostring(self.value)..")"
         end }
     )
@@ -29,7 +29,7 @@ local function Boolean(value, start, stop)
     expect("stop", stop, "position")
     return setmetatable(
         { value = value, start = start, stop = stop, copy = table.copy },
-        { __name = "node.name", __tostring = function(self)
+        { __name = "node.boolean", __tostring = function(self)
             return "("..tostring(self.value)..")"
         end }
     )
@@ -285,7 +285,7 @@ end
 ---@param stop table
 ---@return table
 local function Assign(vars, exprs, scoping, start, stop)
-    expect("vars", vars, "node.params", "node.param", "node.name", "node.field")
+    expect("vars", vars, "node.varlist", "node.param", "node.field")
     expect("exprs", exprs, "node")
     expect("scoping", scoping, "string")
     expect("start", start, "position")

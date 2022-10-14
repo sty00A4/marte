@@ -25,9 +25,18 @@ table.containsStart = function(t, e)
 end
 ---@param t table
 ---@param sep string
-table.join = function(t, sep)
+table.join = function(t, sep, keys)
     local s = ""
-    for _, v in ipairs(t) do s = s..tostring(v)..sep end
+    local f = ipairs
+    if keys then f = pairs end
+    for k, v in f(t) do
+        if keys then s = s..tostring(k).." = " end
+        if metatype(v) == "table" then
+            s = s..table.tostring(v)..sep
+        else 
+            s = s..tostring(v)..sep
+        end
+    end
     if #s > 0 then s = s:sub(1,#s-#sep) end
     return s
 end
@@ -79,7 +88,7 @@ function expect(label, value, ...)
     for _, t in pairs(types) do
         if metaequal(typ, t) then return end
     end
-    error("expected "..label.." to be of type "..table.join(types, "|")..", not "..typ, 2)
+    error("expected "..label.." to be of type "..table.join(types, "|", true)..", not "..typ, 2)
 end
 string.letters = {
     "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t",
