@@ -1,5 +1,3 @@
-meta Person(name: string, age: number)
-    name = name
-    age = age
-    function 
+function f(x: number)
+    return x
 end

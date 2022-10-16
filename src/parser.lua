@@ -318,7 +318,7 @@ end
 ---@param stop table
 ---@return table
 local function Assign(vars, exprs, scoping, start, stop)
-    expect("vars", vars, "node.varlist", "node.param", "node.index")
+    expect("vars", vars, "node.varlist", "node.param", "node.index", "node.name")
     expect("exprs", exprs, "node")
     expect("scoping", scoping, "string")
     expect("start", start, "position")
