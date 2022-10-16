@@ -81,6 +81,20 @@ local function Table(nodes, start, stop)
         end }
     )
 end
+---node.varargs
+---@param start table
+---@param stop table
+---@return table
+local function VarArgs(start, stop)
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { start = start, stop = stop, copy = table.copy },
+        { __name = "node.varargs", __tostring = function(self)
+            return "(...)"
+        end }
+    )
+end
 ---node.field
 ---@param key table
 ---@param value table
@@ -149,6 +163,7 @@ local function Expr(node, start, stop)
         end }
     )
 end
+
 
 ---node.name
 ---@param name string
@@ -635,7 +650,7 @@ end
 ---@return table
 local function Param(name, type_, start, stop)
     expect("name", name, "node.name")
-    expect("type_", type_, "node", "nil")
+    expect("type_", type_, "string", "nil")
     expect("start", start, "position")
     expect("stop", stop, "position")
     return setmetatable(
@@ -1032,8 +1047,13 @@ local function parse(tokens, file)
         advance()
         if token.type == ":" then
             advance()
-            local type_, err = atom() if err then return nil, err end
-            return Param(name, type_, name.start:copy(), type_.stop:copy())
+            if token.type ~= "name" then
+                return error.expectedSymbol("name", token.type, file, token.start, token.stop)
+            end
+            local type_ = token.value
+            local stop = token.stop:copy()
+            advance()
+            return Param(name, type_, name.start:copy(), stop)
         end
         return Param(name, nil, name.start:copy(), name.stop:copy())
     end
@@ -1116,6 +1136,7 @@ local function parse(tokens, file)
         if token.type == "boolean" then advance() return Boolean(token_.value, token_.start:copy(), token_.stop:copy()) end
         if token.type == "nil" then advance() return Nil(token_.start:copy(), token_.stop:copy()) end
         if token.type == "name" then advance() return Name(token_.value, token_.start:copy(), token_.stop:copy()) end
+        if token.type == "..." then advance() return VarArgs(token_.start:copy(), token_.stop:copy()) end
         if token.type == "(" then
             local start = token.start:copy()
             advance()

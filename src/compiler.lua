@@ -123,6 +123,69 @@ local function getString(node, file, context, indent)
             end
             return "["..key.."] = "..value
         end,
+        ["node.function"] = function()
+            local name, err = getString(node.name, file, context) if err then return nil, err end
+            local params = {}
+            local types = {}
+            if metatype(node.params) == "node.param" then
+                table.insert(params, node.params.name.name)
+                types[node.params.name.name] = node.params.type
+            else
+                for _, param in ipairs(node.params) do
+                    table.insert(params, param.name.name)
+                    types[param.name.name] = param.type
+                end
+            end
+            local body body, err = getString(node.node, file, context, indent+1) if err then return nil, err end
+            local str = ""
+            if node.scoping ~= "global" then str = str..node.scoping.." " end
+            str = str..name.." = function("
+            for _, param in ipairs(params) do
+                str = str..param..", "
+            end
+            if #params > 0 then str = str:sub(1, #str-2) end
+            str = str..")"
+            for var, type_ in pairs(types) do
+                str = str.."\n"..("\t"):rep(indent+1)..
+                ("if type(%s) ~= \"%s\" then error(\"expected %s to be of type %s, got \"..type(%s), 2) end")
+                :format(var, type_, var, type_, var)
+            end
+            if metatype(node.node) == "node.body" then str = str..body
+            else str = str.."\n"..("\t"):rep(indent+1)..body end
+            return str.."\n"..("\t"):rep(indent).."end"
+        end,
+        ["node.meta"] = function()
+            local name, err = getString(node.name, file, context) if err then return nil, err end
+            local params = {}
+            local types = {}
+            if metatype(node.params) == "node.param" then
+                table.insert(params, node.params.name.name)
+                types[node.params.name.name] = node.params.type
+            else
+                for _, param in ipairs(node.params) do
+                    table.insert(params, param.name.name)
+                    types[param.name.name] = param.type
+                end
+            end
+            local body body, err = getString(node.node, file, context, indent+1) if err then return nil, err end
+            local str = ""
+            if node.scoping ~= "global" then str = str..node.scoping.." " end
+            str = str..name.." = function("
+            for _, param in ipairs(params) do
+                str = str..param..", "
+            end
+            if #params > 0 then str = str:sub(1, #str-2) end
+            str = str..")"
+            for var, type_ in pairs(types) do
+                str = str.."\n"..("\t"):rep(indent+1)..
+                ("if type(%s) ~= \"%s\" then error(\"expected %s to be of type %s, got \"..type(%s), 2) end")
+                :format(var, type_, var, type_, var)
+            end
+            -- todo meta body
+            if metatype(node.node) == "node.body" then str = str..body
+            else str = str.."\n"..("\t"):rep(indent+1)..body end
+            return str.."\n"..("\t"):rep(indent).."end"
+        end,
     }
     local func = match[metatype(node)]
     if not func then return nil, error.Error("todo: "..metatype(node), file, node.start, node.stop) end
