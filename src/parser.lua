@@ -1138,6 +1138,7 @@ local function parse(tokens, file)
         local nodes = {}
         advance()
         if token.type == "}" then
+            advance()
             return Table({}, start, token.stop:copy())
         end
         local node, err = field() if err then return nil, err end
