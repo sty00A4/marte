@@ -71,13 +71,31 @@ end
 ---@return table
 local function Table(nodes, start, stop)
     expect("value", nodes, "table")
-    for k, n in pairs(nodes) do expect("nodes."..k, n, "node") end
+    for k, n in pairs(nodes) do expect("nodes."..k, n, "node.field") end
     expect("start", start, "position")
     expect("stop", stop, "position")
     return setmetatable(
         { nodes = nodes, start = start, stop = stop, copy = table.copy },
         { __name = "node.table", __tostring = function(self)
             return "({"..table.join(self.nodes, ", ").."})"
+        end }
+    )
+end
+---node.field
+---@param key table
+---@param value table
+---@param start table
+---@param stop table
+---@return table
+local function Field(key, value, start, stop)
+    expect("key", key, "node")
+    expect("value", value, "node")
+    expect("start", start, "position")
+    expect("stop", stop, "position")
+    return setmetatable(
+        { key = key, value = value, start = start, stop = stop, copy = table.copy },
+        { __name = "node.field", __tostring = function(self)
+            return "(["..tostring(self.key).."] = "..tostring(self.value)..")"
         end }
     )
 end
@@ -105,7 +123,7 @@ end
 ---@return table
 local function VarList(nodes, start, stop)
     expect("nodes", nodes, "table")
-    for k, n in pairs(nodes) do expect("nodes."..k, n, "node.name", "node.field") end
+    for k, n in pairs(nodes) do expect("nodes."..k, n, "node.name", "node.index") end
     expect("start", start, "position")
     expect("stop", stop, "position")
     return setmetatable(
@@ -148,21 +166,21 @@ local function Name(name, start, stop)
         end }
     )
 end
----node.field
+---node.index
 ---@param head table
----@param field table
+---@param index table
 ---@param start table
 ---@param stop table
 ---@return table
-local function Field(head, field, start, stop)
+local function Index(head, index, start, stop)
     expect("head", head, "node")
-    expect("field", field, "node")
+    expect("index", index, "node")
     expect("start", start, "position")
     expect("stop", stop, "position")
     return setmetatable(
-        { head = head, field = field, start = start, stop = stop, copy = table.copy },
-        { __name = "node.field", __tostring = function(self)
-            return "("..tostring(self.head).." ["..tostring(self.field).."])"
+        { head = head, index = index, start = start, stop = stop, copy = table.copy },
+        { __name = "node.index", __tostring = function(self)
+            return "("..tostring(self.head).." ["..tostring(self.index).."])"
         end }
     )
 end
@@ -285,7 +303,7 @@ end
 ---@param stop table
 ---@return table
 local function Assign(vars, exprs, scoping, start, stop)
-    expect("vars", vars, "node.varlist", "node.param", "node.field")
+    expect("vars", vars, "node.varlist", "node.param", "node.index")
     expect("exprs", exprs, "node")
     expect("scoping", scoping, "string")
     expect("start", start, "position")
@@ -303,7 +321,7 @@ end
 ---@param stop table
 ---@return table
 local function Return(node, start, stop)
-    expect("vars", node, "node")
+    expect("node", node, "node")
     expect("start", start, "position")
     expect("stop", stop, "position")
     return setmetatable(
@@ -489,7 +507,7 @@ end
 ---@param stop table
 ---@return table
 local function Function(name, params, returnType, node, scoping, start, stop)
-    expect("name", name, "node.name", "node.field")
+    expect("name", name, "node.name", "node.index")
     expect("params", params, "node.params", "node.param")
     expect("returnType", returnType, "node", "nil")
     expect("node", node, "node")
@@ -516,7 +534,7 @@ end
 ---@param stop table
 ---@return table
 local function Meta(name, params, node, scoping, start, stop)
-    expect("name", name, "node.name", "node.field")
+    expect("name", name, "node.name", "node.index")
     expect("params", params, "node.params", "node.param")
     expect("node", node, "node")
     expect("scoping", scoping, "string")
@@ -543,7 +561,7 @@ end
 ---@param stop table
 ---@return table
 local function Metamethod(name, params, returnType, node, scoping, start, stop)
-    expect("name", name, "node.name", "node.field")
+    expect("name", name, "node.name", "node.index")
     expect("params", params, "node.params", "node.param")
     expect("returnType", returnType, "node", "nil")
     expect("node", node, "node")
@@ -569,7 +587,7 @@ end
 ---@param stop table
 ---@return table
 local function Setter(name, params, node, start, stop)
-    expect("name", name, "node.name", "node.field")
+    expect("name", name, "node.name", "node.index")
     expect("params", params, "node.params", "node.param")
     expect("node", node, "node")
     expect("start", start, "position")
@@ -593,7 +611,7 @@ end
 ---@param stop table
 ---@return table
 local function Getter(name, params, node, start, stop)
-    expect("name", name, "node.name", "node.field")
+    expect("name", name, "node.name", "node.index")
     expect("params", params, "node.params", "node.param")
     expect("node", node, "node")
     expect("start", start, "position")
@@ -669,8 +687,8 @@ local function parse(tokens, file)
         end
         return left
     end
-    local chunk, body, stat, expr, concat, negate, logic, comp, arith, term, power, factor, call, field, atom,
-    exprlist, varlist, params, param
+    local chunk, body, stat, expr, concat, logicOr, logicAnd, comp, arith, term, power, factor, length, call, index, atom,
+    exprlist, varlist, params, param, tableconstr, field
     chunk = function()
         local start, stop = token.start:copy(), token.stop:copy()
         local nodes = {}
@@ -846,7 +864,7 @@ local function parse(tokens, file)
             local start = token.start:copy()
             advance()
             local name, params_, returnType, node, err
-            name, err = field() if err then return nil, err end
+            name, err = index() if err then return nil, err end
             if token.type ~= "(" then
                 return nil, error.expectedSymbol("'('", token.type, file, token.start, token.stop)
             end
@@ -869,7 +887,7 @@ local function parse(tokens, file)
             local start = token.start:copy()
             advance()
             local name, params_, node, err
-            name, err = field() if err then return nil, err end
+            name, err = index() if err then return nil, err end
             if token.type ~= "(" then
                 return nil, error.expectedSymbol("'('", token.type, file, token.start, token.stop)
             end
@@ -888,7 +906,7 @@ local function parse(tokens, file)
             local start = token.start:copy()
             advance()
             local name, params_, returnType, node, err
-            name, err = field() if err then return nil, err end
+            name, err = index() if err then return nil, err end
             if token.type ~= "(" then
                 return nil, error.expectedSymbol("'('", token.type, file, token.start, token.stop)
             end
@@ -907,7 +925,7 @@ local function parse(tokens, file)
             local start = token.start:copy()
             advance()
             local name, params_, node, err
-            name, err = field() if err then return nil, err end
+            name, err = index() if err then return nil, err end
             if token.type ~= "(" then
                 return nil, error.expectedSymbol("'('", token.type, file, token.start, token.stop)
             end
@@ -926,7 +944,7 @@ local function parse(tokens, file)
             local start = token.start:copy()
             advance()
             local name, params_, node, err
-            name, err = field() if err then return nil, err end
+            name, err = index() if err then return nil, err end
             if token.type ~= "(" then
                 return nil, error.expectedSymbol("'('", token.type, file, token.start, token.stop)
             end
@@ -942,12 +960,12 @@ local function parse(tokens, file)
             return Getter(name, params_, node, start, stop)
         end
         local idx_ = idx
-        local node, err = field() if err then return nil, err end
+        local node, err = index() if err then return nil, err end
         if token.type == "(" then
             idx = idx_ token = tokens[idx]
             return call()
         end
-        if metatype(node) == "node.name" or metatype(node) == "node.field" then
+        if metatype(node) == "node.name" or metatype(node) == "node.index" then
             idx = idx_ token = tokens[idx]
             local vars vars, err = varlist() if err then return nil, err end
             if token.type == "=" then
@@ -958,7 +976,7 @@ local function parse(tokens, file)
         end
         return nil, error.unexpectedSymbol(file:sub(node.start, node.stop), file, node.start, node.stop)
     end
-    expr = function() return concat() end
+    expr = function() return logicOr() end
     exprlist = function()
         local start, stop = token.start:copy(), token.stop:copy()
         local nodes = {}
@@ -976,11 +994,11 @@ local function parse(tokens, file)
     varlist = function()
         local start, stop = token.start:copy(), token.stop:copy()
         local nodes = {}
-        local node, err = field() if err then return nil, err end
+        local node, err = index() if err then return nil, err end
         table.insert(nodes, node)
         while token.type == "," do
             advance()
-            node, err = field() if err then return nil, err end
+            node, err = index() if err then return nil, err end
             if token.type == ":" then
                 advance()
                 local type_ type_, err = atom() if err then return nil, err end
@@ -1019,32 +1037,33 @@ local function parse(tokens, file)
         end
         return Param(name, nil, name.start:copy(), name.stop:copy())
     end
-    concat = function() return binop({".."}, negate) end
-    negate = function()
-        if token.type == "not" then
-            local op = token:copy()
-            advance()
-            local node, err = negate() if err then return nil, err end
-            return UnaryLeft(op, node, op.start:copy(), node.stop:copy())
-        end
-        return logic()
-    end
-    logic = function() return binop({"and","or"}, comp) end
-    comp = function() return binop({"==","~=","<",">","<=",">="}, arith) end
+    logicOr = function() return binop({"or"}, logicAnd) end
+    logicAnd = function() return binop({"and"}, comp) end
+    comp = function() return binop({"==","~=","<",">","<=",">="}, concat) end
+    concat = function() return binop({".."}, arith) end
     arith = function() return binop({"+","-"}, term) end
-    term = function() return binop({"*","/","//","%"}, power) end
-    power = function() return binop({"^"}, factor) end
+    term = function() return binop({"*","/","//","%"}, factor) end
     factor = function()
-        if token.type == "-" then
+        if token.type == "-" or token.type == "not" then
             local op = token:copy()
             advance()
             local node, err = factor() if err then return nil, err end
             return UnaryLeft(op, node, op.start:copy(), node.stop:copy())
         end
+        return power()
+    end
+    power = function() return binop({"^"}, length) end
+    length = function()
+        if token.type == "#" then
+            local op = token:copy()
+            advance()
+            local node, err = length() if err then return nil, err end
+            return UnaryLeft(op, node, op.start:copy(), node.stop:copy())
+        end
         return call()
     end
     call = function()
-        local head, err = field() if err then return nil, err end
+        local head, err = index() if err then return nil, err end
         while token.type == ":" do
             advance()
             if token.type ~= "name" then return nil, error.expectedSymbol("name", token.type, file, token.start, token.stop) end
@@ -1072,12 +1091,12 @@ local function parse(tokens, file)
         end
         return head
     end
-    field = function()
+    index = function()
         local head, err = atom() if err then return nil, err end
         while token.type == "." do
             advance()
             local field_ field_, err = atom() if err then return nil, err end
-            head = Field(head, field_, head.start:copy(), field_.stop:copy())
+            head = Index(head, field_, head.start:copy(), field_.stop:copy())
         end
         while token.type == "[" do
             advance()
@@ -1086,7 +1105,7 @@ local function parse(tokens, file)
                 return nil, error.expectedSymbol("']'", token.type, file, token.start, token.stop)
             end
             advance()
-            head = Field(head, field_, head.start:copy(), field_.stop:copy())
+            head = Index(head, field_, head.start:copy(), field_.stop:copy())
         end
         return head
     end
@@ -1108,14 +1127,69 @@ local function parse(tokens, file)
             advance()
             return Expr(node, start, stop)
         end
+        if token.type == "{" then return tableconstr() end
         return nil, error.unexpectedSymbol(file:sub(token.start, token.stop), file, token.start:copy(), token.stop:copy())
+    end
+    tableconstr = function()
+        if token.type ~= "{" then
+            return nil, error.expectedSymbol("'{'", token.type, file, token.start:copy(), token.stop:copy())
+        end
+        local start = token.start:copy()
+        local nodes = {}
+        advance()
+        if token.type == "}" then
+            return Table({}, start, token.stop:copy())
+        end
+        local node, err = field() if err then return nil, err end
+        table.insert(nodes, node)
+        while token.type == "," or token.type == ";" do
+            advance()
+            if token.type == "}" then break end
+            node, err = field() if err then return nil, err end
+            table.insert(nodes, node)
+        end
+        if token.type ~= "}" then
+            return nil, error.expectedSymbol("'}'", token.type, file, token.start:copy(), token.stop:copy())
+        end
+        local stop = token.stop:copy()
+        advance()
+        return Table(nodes, start, stop)
+    end
+    field = function()
+        if token.type == "[" then
+            local start = token.start:copy()
+            local key, value, err
+            advance()
+            key, err = expr() if err then return nil, err end
+            if token.type ~= "]" then
+                return nil, error.expectedSymbol("']'", token.type, file, token.start:copy(), token.stop:copy())
+            end
+            advance()
+            if token.type ~= "=" then
+                return nil, error.expectedSymbol("'='", token.type, file, token.start:copy(), token.stop:copy())
+            end
+            advance()
+            value, err = expr() if err then return nil, err end
+            return Field(key, value, start, value.stop:copy())
+        elseif token.type == "name" then
+            local key, value, err
+            key = Name(token.value, token.start:copy(), token.stop:copy())
+            advance()
+            if token.type ~= "=" then
+                return nil, error.expectedSymbol("'='", token.type, file, token.start:copy(), token.stop:copy())
+            end
+            advance()
+            value, err = expr() if err then return nil, err end
+            return Field(key, value, key.start:copy(), value.stop:copy())
+        end
+        return expr()
     end
     return chunk()
 end
 
 return { parse=parse, node = {
     Number=Number, Boolean=Boolean, String=String, Nil=Nil, Table=Table, ExprList=ExprList, VarList=VarList,
-    Expr=Expr, Name=Name, Field=Field, Call=Call, SelfCall=SelfCall, Body=Body, Binary=Binary, UnaryLeft=UnaryLeft,
+    Expr=Expr, Name=Name, Index=Index, Call=Call, SelfCall=SelfCall, Body=Body, Binary=Binary, UnaryLeft=UnaryLeft,
     UnaryRight=UnaryRight, Assign=Assign, Return=Return, Goto=Goto, Label=Label, If=If, While=While, Repeat=Repeat,
     Do=Do, ForIn=ForIn, For=For, Function=Function, Metamethod=Metamethod, Setter=Setter, Getter=Getter, Param=Param,
     Params=Params

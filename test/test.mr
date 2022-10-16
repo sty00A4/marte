@@ -1,2 +1,1 @@
-local name, age = "sty", 18
-print(name)
+return { a = 1, b = 2 }

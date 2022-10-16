@@ -33,6 +33,7 @@ local function getString(node, file, context, indent)
                 local s, err = getString(n, file, context) if err then return nil, err end
                 str = str .. s .. ", "
             end
+            if #str == 2 then return "{}" else str = str:sub(1, #str-2) end
             str = str .. " }"
             return str
         end,
@@ -70,23 +71,23 @@ local function getString(node, file, context, indent)
         ["node.name"] = function()
             return node.name
         end,
-        ["node.field"] = function()
+        ["node.index"] = function()
             local head, err = getString(node.head, file, context) if err then return nil, err end
-            local field, err = getString(node.field, file, context) if err then return nil, err end
-            if metatype(node.field) == "node.name" then
-                return head.."."..field
+            local index index, err = getString(node.index, file, context) if err then return nil, err end
+            if metatype(node.index) == "node.name" then
+                return head.."."..index
             end
-            return head.."["..field.."]"
+            return head.."["..index.."]"
         end,
-        ["node.call"] = function(indent)
+        ["node.call"] = function()
             local head, err = getString(node.head, file, context) if err then return nil, err end
-            local args, err = getString(node.args, file, context) if err then return nil, err end
+            local args args, err = getString(node.args, file, context) if err then return nil, err end
             return head.."("..args..")"
         end,
-        ["node.selfCall"] = function(indent)
+        ["node.selfCall"] = function()
             local head, err = getString(node.head, file, context) if err then return nil, err end
-            local field, err = getString(node.field, file, context) if err then return nil, err end
-            local args, err = getString(node.args, file, context) if err then return nil, err end
+            local field field, err = getString(node.field, file, context) if err then return nil, err end
+            local args args, err = getString(node.args, file, context) if err then return nil, err end
             return head..":"..field.."("..args..")"
         end,
         ["node.body"] = function()
@@ -100,7 +101,7 @@ local function getString(node, file, context, indent)
         end,
         ["node.assign"] = function()
             local vars, err = getString(node.vars, file, context) if err then return nil, err end
-            local exprs, err = getString(node.exprs, file, context) if err then return nil, err end
+            local exprs exprs, err = getString(node.exprs, file, context) if err then return nil, err end
             if node.scoping == "local" then
                 return "local "..vars.." = "..exprs
             end
@@ -109,6 +110,18 @@ local function getString(node, file, context, indent)
                 return "local "..vars.." = "..exprs
             end
             return vars.." = "..exprs
+        end,
+        ["node.return"] = function()
+            local str, err = getString(node.node, file, context) if err then return nil, err end
+            return "return "..str
+        end,
+        ["node.field"] = function()
+            local key, err = getString(node.key, file, context) if err then return nil, err end
+            local value value, err = getString(node.value, file, context) if err then return nil, err end
+            if metatype(node.key) == "node.name" then
+                return key.." = "..value
+            end
+            return "["..key.."] = "..value
         end,
     }
     local func = match[metatype(node)]
@@ -128,7 +141,7 @@ local function compile(file, debug)
     local node node, err = parser.parse(tokens, file) if err then return nil, err end
     if debug then print(tostring(node)) end
     local context = { exports = {} }
-    local str, err = getString(node, file, context) if err then return nil, err end
+    local str str, err = getString(node, file, context) if err then return nil, err end
     if #context.exports > 0 then
         str = str.."\nreturn { "
         for _, n in ipairs(context.exports) do
