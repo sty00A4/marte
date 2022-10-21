@@ -101,6 +101,7 @@ local function getString(node, file, context, indent)
                 local s, err = getString(n, file, context, indent+1) if err then return nil, err end
                 str = str.."\n"..("\t"):rep(indent)..s
             end
+            str = str:sub(2)
             if #str == 0 then str = " " end
             return str
         end,

@@ -1,4 +1,4 @@
 local function add(x: number, y: number)
     return x + y
 end
-print(add("hello", 2))
+print(add(1, 2))
