@@ -289,7 +289,13 @@ getString = function(node, file, context, indent)
                 end
             end
             local strHead = ""
-            if node.scoping ~= "global" then strHead = strHead..node.scoping.." " end
+            if node.scoping == "local" then
+                strHead = strHead.."local "
+            end
+            if node.scoping == "export" then
+                table.insert(context.exports, node.name)
+                strHead = strHead.."local "
+            end
             strHead = strHead..name.." = function("
             for _, param in ipairs(params) do
                 strHead = strHead..param..", "
@@ -375,6 +381,7 @@ local function compile(file, info)
                 end
             end
         end
+        str = str:sub(1, #str-2)
         str = str.." }"
     end
     if info then print(str) end

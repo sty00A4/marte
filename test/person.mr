@@ -1,9 +1,12 @@
 export meta Person(name: string , age: number)
 	name = name
 	age = age
-	function greet(self: Person): string
+	function greet(self): string
 		return "Hello! My name is "..self.name.." and I'm "..tostring(self.age).." years old"
 	end
-	setter name(self: Person, v: string) self.name = v end
-	setter age(self: Person, v: number) self.age = v end
+	setter name(self, v: string) self.name = v end
+	setter age(self, v: number) self.age = v end
 end
+
+local sty = Person("sty", 18)
+print(sty:greet())
