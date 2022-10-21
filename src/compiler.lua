@@ -1,5 +1,5 @@
 require "src.global"
-local error = require("src.error")
+local error_ = require("src.error")
 local lexer = require("src.lexer")
 local parser = require("src.parser")
 
@@ -36,6 +36,11 @@ local function getString(node, file, context, indent)
             if #str == 2 then return "{}" else str = str:sub(1, #str-2) end
             str = str .. " }"
             return str
+        end,
+        ["node.binary"] = function()
+            local left, err = getString(node.left, file, context) if err then return nil, err end
+            local right right, err = getString(node.right, file, context) if err then return nil, err end
+            return left.." "..node.op.type.." "..right
         end,
         ["node.exprlist"] = function()
             local str = ""
@@ -131,14 +136,20 @@ local function getString(node, file, context, indent)
                 table.insert(params, node.params.name.name)
                 types[node.params.name.name] = node.params.type
             else
-                for _, param in ipairs(node.params) do
+                for _, param in ipairs(node.params.nodes) do
                     table.insert(params, param.name.name)
                     types[param.name.name] = param.type
                 end
             end
             local body body, err = getString(node.node, file, context, indent+1) if err then return nil, err end
             local str = ""
-            if node.scoping ~= "global" then str = str..node.scoping.." " end
+            if node.scoping == "local" then
+                str = str.."local "
+            end
+            if node.scoping == "export" then
+                table.insert(context.exports, node.name)
+                str = str.."local "
+            end
             str = str..name.." = function("
             for _, param in ipairs(params) do
                 str = str..param..", "
@@ -188,21 +199,21 @@ local function getString(node, file, context, indent)
         end,
     }
     local func = match[metatype(node)]
-    if not func then return nil, error.Error("todo: "..metatype(node), file, node.start, node.stop) end
+    if not func then return nil, error_.Error("todo: "..metatype(node), file, node.start, node.stop) end
     return func(indent)
 end
 
 ---returns the compiled version of the file
 ---@param file table
----@param debug boolean|nil
+---@param info boolean|nil
 ---@return string|nil, table|nil
-local function compile(file, debug)
+local function compile(file, info)
     expect("file", file, "file")
-    expect("debug", debug, "boolean", "nil")
+    expect("info", info, "boolean", "nil")
     local tokens, err = lexer.lex(file) if err then return nil, err end
-    if debug then print(table.tostring(tokens)) end
+    if info then print(table.tostring(tokens)) end
     local node node, err = parser.parse(tokens, file) if err then return nil, err end
-    if debug then print(tostring(node)) end
+    if info then print(tostring(node)) end
     local context = { exports = {} }
     local str str, err = getString(node, file, context) if err then return nil, err end
     if #context.exports > 0 then
@@ -222,18 +233,45 @@ local function compile(file, debug)
         end
         str = str.." }"
     end
-    if debug then print(str) end
+    if info then print(str) end
     return str, err
+end
+
+local function IsDir(path)
+    expect("path", path, "string")
+    local f = io.open(path, "r")
+    local ok, err, code = f:read("*a")
+    f:close()
+    return code == 21
+end
+
+local function compileFile(path, target, info)
+    local file_ = io.open(path, "r")
+    if not file_ then error("file doesn't exist", 2) end
+    local text, err, code = file_:read("*a")
+    file_:close()
+    local file = lexer.File(path, text)
+
+    local str str, err = compile(file, info) if err then return nil, err end
+    if type(target) ~= "string" then
+        local split = path:split(".")
+        target = table.join(table.sub(split, 1, #split-1), ".")..".lua"
+    end
+    local targetFile = io.open(target, "w")
+    targetFile:write(str)
+    return target
 end
 
 local args = {...}
 if #args > 0 then
-    local file_ = io.open(args[1], "r")
-    if not file_ then error("file doesn't exist", 2) end
-    local text = file_:read("*a")
-    local file = lexer.File(args[1], text)
-
-    local str, err = compile(file, true) if err then print(tostring(err)) return end
+    local info = false
+    if IsDir(args[1]) then
+        print "directory compiling not implemented yet" return
+    else
+        local path, err = compileFile(args[1], args[2], info) if err then print(err) return end
+        if info then print(args[1], "->", path) end
+        dofile(path) return
+    end
 else
     print([[
         Usage:

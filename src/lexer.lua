@@ -73,7 +73,7 @@ local function lex(file)
             local start, stop = Position(idx, ln, col), Position(idx, ln, col)
             local word = char
             advance()
-            while (table.contains(string.letters, char) or table.contains(string.letters, char)) and #char > 0 do
+            while (table.contains(string.letters, char) or table.contains(string.digits, char)) and #char > 0 do
                 word = word .. char
                 stop = Position(idx, ln, col)
                 advance()

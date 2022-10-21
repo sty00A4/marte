@@ -976,7 +976,7 @@ local function parse(tokens, file)
         end
         local idx_ = idx
         local node, err = index() if err then return nil, err end
-        if token.type == "(" then
+        if token.type == "(" or token.type == "string" or token.type == "{" then
             idx = idx_ token = tokens[idx]
             return call()
         end
@@ -1100,14 +1100,22 @@ local function parse(tokens, file)
             advance()
             head = SelfCall(head, name, args, head.start:copy(), args.stop:copy())
         end
-        while token.type == "(" do
-            advance()
-            local args args, err = exprlist() if err then return nil, err end
-            if token.type ~= ")" then
-                return nil, error.expectedSymbol("')'", token.type, file, token.start, token.stop)
+        while token.type == "(" or token.type == "string" or token.type == "{" do
+            if token.type == "string" then
+                head = Call(head, String(token.value, token.start:copy(), token.stop:copy()), head.start:copy(), token.stop:copy())
+                advance()
+            elseif token.type == "{" then
+                local arg arg, err = tableconstr() if err then return nil, err end
+                head = Call(head, arg, head.start:copy(), arg.stop:copy())
+            elseif token.type == "(" then
+                advance()
+                local args args, err = exprlist() if err then return nil, err end
+                if token.type ~= ")" then
+                    return nil, error.expectedSymbol("')'", token.type, file, token.start, token.stop)
+                end
+                advance()
+                head = Call(head, args, head.start:copy(), args.stop:copy())
             end
-            advance()
-            head = Call(head, args, head.start:copy(), args.stop:copy())
         end
         return head
     end

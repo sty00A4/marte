@@ -41,6 +41,18 @@ table.join = function(t, sep, keys)
     return s
 end
 ---@param t table
+---@param i number|nil
+---@param j number|nil
+table.sub = function(t, i, j)
+    if not i then i = 1 end
+    if not j then j = #t end
+    local newT = {}
+    for idx = i, j do
+        table.insert(newT, t[idx])
+    end
+    return newT
+end
+---@param t table
 table.copy = function(t)
     if metatype(t) ~= "table" then return t end
     local newT = {}
