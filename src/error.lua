@@ -38,5 +38,32 @@ local function expectedSymbol(token, recvToken, file, start, stop)
     expect("argument #5", stop, "position")
     return Error(token.." expected, but got "..recvToken, file, start, stop)
 end
+---@param types table<string>
+---@param recvType string
+---@param file table
+---@param start table
+---@param stop table
+local function expectedNode(types, recvType, file, start, stop)
+    expect("argument #1", types, "table")
+    expect("argument #2", recvType, "string")
+    expect("argument #3", file, "file")
+    expect("argument #4", start, "position")
+    expect("argument #5", stop, "position")
+    return Error(table.join(types, "|").." expected, but got "..recvType, file, start, stop)
+end
+---@param scoping string
+---@param file table
+---@param start table
+---@param stop table
+local function unexpectedScoping(scoping, file, start, stop)
+    expect("argument #1", scoping, "string")
+    expect("argument #3", file, "file")
+    expect("argument #4", start, "position")
+    expect("argument #5", stop, "position")
+    return Error("unexpected scoping '"..scoping.."'", file, start, stop)
+end
 
-return { Error=Error, unexpectedSymbol=unexpectedSymbol, expectedSymbol=expectedSymbol }
+return {
+    Error=Error, unexpectedSymbol=unexpectedSymbol, expectedSymbol=expectedSymbol, expectedNode=expectedNode,
+    unexpectedScoping=unexpectedScoping
+}

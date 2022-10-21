@@ -232,7 +232,7 @@ local function SelfCall(head, name, args, start, stop)
     expect("stop", stop, "position")
     return setmetatable(
         { head = head, name = name, args = args, start = start, stop = stop, copy = table.copy },
-        { __name = "node.call", __tostring = function(self)
+        { __name = "node.selfCall", __tostring = function(self)
             return "(selfcall "..tostring(self.head).." : "..tostring(self.name).." "..tostring(self.args)..")"
         end }
     )
@@ -1093,9 +1093,14 @@ local function parse(tokens, file)
                 return nil, error.expectedSymbol("'('", token.type, file, token.start, token.stop)
             end
             advance()
-            local args args, err = exprlist() if err then return nil, err end
-            if token.type ~= ")" then
-                return nil, error.expectedSymbol("')'", token.type, file, token.start, token.stop)
+            local args
+            if token.type == ")" then
+                args = ExprList({}, token.start:copy(), token.stop:copy())
+            else
+                args, err = exprlist() if err then return nil, err end
+                if token.type ~= ")" then
+                    return nil, error.expectedSymbol("')'", token.type, file, token.start, token.stop)
+                end
             end
             advance()
             head = SelfCall(head, name, args, head.start:copy(), args.stop:copy())
@@ -1109,9 +1114,14 @@ local function parse(tokens, file)
                 head = Call(head, arg, head.start:copy(), arg.stop:copy())
             elseif token.type == "(" then
                 advance()
-                local args args, err = exprlist() if err then return nil, err end
-                if token.type ~= ")" then
-                    return nil, error.expectedSymbol("')'", token.type, file, token.start, token.stop)
+                local args
+                if token.type == ")" then
+                    args = ExprList({}, token.start:copy(), token.stop:copy())
+                else
+                    args, err = exprlist() if err then return nil, err end
+                    if token.type ~= ")" then
+                        return nil, error.expectedSymbol("')'", token.type, file, token.start, token.stop)
+                    end
                 end
                 advance()
                 head = Call(head, args, head.start:copy(), args.stop:copy())

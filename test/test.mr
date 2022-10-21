@@ -1,4 +1,16 @@
-local function add(x: number, y: number)
-    return x + y
+meta Person(name: string, age: number)
+    name = name
+    age = age
+    function greet(self)
+        return "Hello! My name is "..self.name.." and I'm "..tostring(self.age).." years old."
+    end
+    setter name(self, newName: string)
+        self.name = newName
+    end
+    getter nameAge(self)
+        return self.name.." "..tostring(self.age)
+    end
 end
-print(add(1, 2))
+
+local sty = Person("sty", 18)
+print(sty.nameAge)

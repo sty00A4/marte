@@ -3,12 +3,61 @@ local error_ = require("src.error")
 local lexer = require("src.lexer")
 local parser = require("src.parser")
 
+local getString, getStringMeta
+
 ---returns the string version of the node
 ---@param node table
 ---@param file table
 ---@param context table
+---@param metadata table
+---@param indent number|nil
 ---@return string|nil, table|nil
-local function getString(node, file, context, indent)
+getStringMeta = function(node, file, context, metadata, indent)
+    if indent == nil then indent = 0 end
+    expect("node", node, "node")
+    expect("file", file, "file")
+    expect("context", context, "table")
+    expect("metadata", metadata, "table")
+    if metatype(node) == "node.assign" then
+        if node.scoping ~= "global" then
+            return nil, error_.unexpectedScoping(node.scoping, file, node.start:copy(), node.stop:copy())
+        end
+        if metatype(node.vars) == "node.name" then
+            local name, err = getString(node.vars, file, context) if err then return nil, err end
+            if metatype(node.exprs) == "node.exprlist" then
+                return nil, error_.expectedNode({"expr"}, "exprlist", file, node.exprs.start:copy(), node.exprs.stop:copy())
+            end
+            local expr expr, err = getString(node.exprs, file, context) if err then return nil, err end
+            return name.." = "..expr
+        end
+        return nil, error_.expectedNode({"node.param", "node.name"},
+        metatype(node.vars), file, node.vars.start:copy(), node.vars.stop:copy())
+    end
+    if metatype(node) == "node.function" then
+        if node.scoping ~= "global" then
+            return nil, error_.unexpectedScoping(node.scoping, file, node.start:copy(), node.stop:copy())
+        end
+        return getString(node, file, context, indent)
+    end
+    if metatype(node) == "node.setter" then
+        table.insert(metadata.setters, node.name.name)
+        return getString(node, file, context, indent)
+    end
+    if metatype(node) == "node.getter" then
+        table.insert(metadata.getters, node.name.name)
+        return getString(node, file, context, indent)
+    end
+    return nil, error_.expectedNode({"node.assign", "node.function", "node.setter", "node.getter"},
+    metatype(node), file, node.start:copy(), node.stop:copy())
+end
+
+---returns the string version of the node
+---@param node table
+---@param file table
+---@param context table
+---@param indent number|nil
+---@return string|nil, table|nil
+getString = function(node, file, context, indent)
     if indent == nil then indent = 0 end
     expect("node", node, "node")
     expect("file", file, "file")
@@ -91,7 +140,7 @@ local function getString(node, file, context, indent)
         end,
         ["node.selfCall"] = function()
             local head, err = getString(node.head, file, context) if err then return nil, err end
-            local field field, err = getString(node.field, file, context) if err then return nil, err end
+            local field field, err = getString(node.name, file, context) if err then return nil, err end
             local args args, err = getString(node.args, file, context) if err then return nil, err end
             return head..":"..field.."("..args..")"
         end,
@@ -101,7 +150,7 @@ local function getString(node, file, context, indent)
                 local s, err = getString(n, file, context, indent+1) if err then return nil, err end
                 str = str.."\n"..("\t"):rep(indent)..s
             end
-            str = str:sub(2)
+            str = str:sub(1)
             if #str == 0 then str = " " end
             return str
         end,
@@ -142,7 +191,6 @@ local function getString(node, file, context, indent)
                     types[param.name.name] = param.type
                 end
             end
-            local body body, err = getString(node.node, file, context, indent+1) if err then return nil, err end
             local str = ""
             if node.scoping == "local" then
                 str = str.."local "
@@ -162,6 +210,67 @@ local function getString(node, file, context, indent)
                 ("if type(%s) ~= \"%s\" then error(\"expected %s to be of type %s, got \"..type(%s), 2) end")
                 :format(var, type_, var, type_, var)
             end
+            local body body, err = getString(node.node, file, context, indent+1) if err then return nil, err end
+            if metatype(node.node) == "node.body" then str = str..body
+            else str = str.."\n"..("\t"):rep(indent+1)..body end
+            return str.."\n"..("\t"):rep(indent).."end"
+        end,
+        ["node.setter"] = function()
+            local name, err = getString(node.name, file, context) if err then return nil, err end
+            local params = {}
+            local types = {}
+            if metatype(node.params) == "node.param" then
+                table.insert(params, node.params.name.name)
+                types[node.params.name.name] = node.params.type
+            else
+                for _, param in ipairs(node.params.nodes) do
+                    table.insert(params, param.name.name)
+                    types[param.name.name] = param.type
+                end
+            end
+            local str = ""
+            str = str.."__setter_"..name.." = function("
+            for _, param in ipairs(params) do
+                str = str..param..", "
+            end
+            if #params > 0 then str = str:sub(1, #str-2) end
+            str = str..")"
+            for var, type_ in pairs(types) do
+                str = str.."\n"..("\t"):rep(indent+1)..
+                ("if type(%s) ~= \"%s\" then error(\"expected %s to be of type %s, got \"..type(%s), 2) end")
+                :format(var, type_, var, type_, var)
+            end
+            local body body, err = getString(node.node, file, context, indent+1) if err then return nil, err end
+            if metatype(node.node) == "node.body" then str = str..body
+            else str = str.."\n"..("\t"):rep(indent+1)..body end
+            return str.."\n"..("\t"):rep(indent).."end"
+        end,
+        ["node.getter"] = function()
+            local name, err = getString(node.name, file, context) if err then return nil, err end
+            local params = {}
+            local types = {}
+            if metatype(node.params) == "node.param" then
+                table.insert(params, node.params.name.name)
+                types[node.params.name.name] = node.params.type
+            else
+                for _, param in ipairs(node.params.nodes) do
+                    table.insert(params, param.name.name)
+                    types[param.name.name] = param.type
+                end
+            end
+            local str = ""
+            str = str.."__getter_"..name.." = function("
+            for _, param in ipairs(params) do
+                str = str..param..", "
+            end
+            if #params > 0 then str = str:sub(1, #str-2) end
+            str = str..")"
+            for var, type_ in pairs(types) do
+                str = str.."\n"..("\t"):rep(indent+1)..
+                ("if type(%s) ~= \"%s\" then error(\"expected %s to be of type %s, got \"..type(%s), 2) end")
+                :format(var, type_, var, type_, var)
+            end
+            local body body, err = getString(node.node, file, context, indent+1) if err then return nil, err end
             if metatype(node.node) == "node.body" then str = str..body
             else str = str.."\n"..("\t"):rep(indent+1)..body end
             return str.."\n"..("\t"):rep(indent).."end"
@@ -174,29 +283,63 @@ local function getString(node, file, context, indent)
                 table.insert(params, node.params.name.name)
                 types[node.params.name.name] = node.params.type
             else
-                for _, param in ipairs(node.params) do
+                for _, param in ipairs(node.params.nodes) do
                     table.insert(params, param.name.name)
                     types[param.name.name] = param.type
                 end
             end
-            local body body, err = getString(node.node, file, context, indent+1) if err then return nil, err end
-            local str = ""
-            if node.scoping ~= "global" then str = str..node.scoping.." " end
-            str = str..name.." = function("
+            local strHead = ""
+            if node.scoping ~= "global" then strHead = strHead..node.scoping.." " end
+            strHead = strHead..name.." = function("
             for _, param in ipairs(params) do
-                str = str..param..", "
+                strHead = strHead..param..", "
             end
-            if #params > 0 then str = str:sub(1, #str-2) end
-            str = str..")"
+            if #params > 0 then strHead = strHead:sub(1, #strHead-2) end
+            strHead = strHead..")"
+            -- main body table
+            local strBody = ("\t"):rep(indent+1).."return setmetatable({"
+            local metadata = { setters = {}, getters = {} }
+            if metatype(node.node) == "node.body" then
+                for _, stat in ipairs(node.node.nodes) do
+                    local str str, err = getStringMeta(stat, file, context, metadata, indent+2) if err then return nil, err end
+                    strBody = strBody.."\n"..("\t"):rep(indent+2)..str..","
+                end
+            else
+                local body body, err = getStringMeta(node.node, file, context, metadata, indent+2) if err then return nil, err end
+                strBody = strBody.."\n"..("\t"):rep(indent+1)..body
+            end
+            strBody = strBody.."\n"..("\t"):rep(indent+1).."}, {"
+            -- __name
+            strBody = strBody.."\n"..("\t"):rep(indent+2).."__name = \""..name.."\","
+            -- setters
+            if #metadata.setters > 0 then
+                strBody = strBody.."\n"..("\t"):rep(indent+2).."__newindex = function(s, k, v)"
+                for _, var in ipairs(metadata.setters) do
+                    strBody = strBody.."\n"..("\t"):rep(indent+3)..
+                    "if k == \""..var.."\" then return s:__setter_"..var.."(v) end"
+                end
+                strBody = strBody.."\n"..("\t"):rep(indent+3).."return rawset(s, k, v)"
+                .."\n"..("\t"):rep(indent+2).."end,"
+            end
+            -- getters
+            if #metadata.getters > 0 then
+                strBody = strBody.."\n"..("\t"):rep(indent+2).."__index = function(s, k)"
+                for _, var in ipairs(metadata.getters) do
+                    strBody = strBody.."\n"..("\t"):rep(indent+3)..
+                    "if k == \""..var.."\" then return s:__getter_"..var.."() end"
+                end
+                strBody = strBody.."\n"..("\t"):rep(indent+3).."return rawget(s, k)"
+                .."\n"..("\t"):rep(indent+2).."end,"
+            end
+            -- closing setmetatable
+            strBody = strBody.."\n"..("\t"):rep(indent+1).."})"
+            -- final types
             for var, type_ in pairs(types) do
-                str = str.."\n"..("\t"):rep(indent+1)..
+                strHead = strHead.."\n"..("\t"):rep(indent+1)..
                 ("if type(%s) ~= \"%s\" then error(\"expected %s to be of type %s, got \"..type(%s), 2) end")
                 :format(var, type_, var, type_, var)
             end
-            -- todo meta body
-            if metatype(node.node) == "node.body" then str = str..body
-            else str = str.."\n"..("\t"):rep(indent+1)..body end
-            return str.."\n"..("\t"):rep(indent).."end"
+            return strHead.."\n"..strBody.."\n"..("\t"):rep(indent).."end"
         end,
     }
     local func = match[metatype(node)]
