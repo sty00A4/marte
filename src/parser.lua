@@ -1084,35 +1084,15 @@ local function parse(tokens, file)
     end
     call = function()
         local head, err = index() if err then return nil, err end
-        while token.type == ":" do
-            advance()
-            if token.type ~= "name" then return nil, error.expectedSymbol("name", token.type, file, token.start, token.stop) end
-            local name = Name(token.value, token.start:copy(), token.stop:copy())
-            advance()
-            if token.type ~= "(" then
-                return nil, error.expectedSymbol("'('", token.type, file, token.start, token.stop)
-            end
-            advance()
-            local args
-            if token.type == ")" then
-                args = ExprList({}, token.start:copy(), token.stop:copy())
-            else
-                args, err = exprlist() if err then return nil, err end
-                if token.type ~= ")" then
-                    return nil, error.expectedSymbol("')'", token.type, file, token.start, token.stop)
-                end
-            end
-            advance()
-            head = SelfCall(head, name, args, head.start:copy(), args.stop:copy())
-        end
-        while token.type == "(" or token.type == "string" or token.type == "{" do
-            if token.type == "string" then
-                head = Call(head, String(token.value, token.start:copy(), token.stop:copy()), head.start:copy(), token.stop:copy())
+        while token.type == ":" or token.type == "(" or token.type == "string" or token.type == "{" do
+            while token.type == ":" do
                 advance()
-            elseif token.type == "{" then
-                local arg arg, err = tableconstr() if err then return nil, err end
-                head = Call(head, arg, head.start:copy(), arg.stop:copy())
-            elseif token.type == "(" then
+                if token.type ~= "name" then return nil, error.expectedSymbol("name", token.type, file, token.start, token.stop) end
+                local name = Name(token.value, token.start:copy(), token.stop:copy())
+                advance()
+                if token.type ~= "(" then
+                    return nil, error.expectedSymbol("'('", token.type, file, token.start, token.stop)
+                end
                 advance()
                 local args
                 if token.type == ")" then
@@ -1124,7 +1104,30 @@ local function parse(tokens, file)
                     end
                 end
                 advance()
-                head = Call(head, args, head.start:copy(), args.stop:copy())
+                head = SelfCall(head, name, args, head.start:copy(), args.stop:copy())
+            end
+            while token.type == "(" or token.type == "string" or token.type == "{" do
+                if token.type == "string" then
+                    head = Call(head, String(token.value, token.start:copy(), token.stop:copy()), head.start:copy(), token.stop:copy())
+                    advance()
+                elseif token.type == "{" then
+                    local arg arg, err = tableconstr() if err then return nil, err end
+                    head = Call(head, arg, head.start:copy(), arg.stop:copy())
+                elseif token.type == "(" then
+                    advance()
+                    local args
+                    if token.type == ")" then
+                        args = ExprList({}, token.start:copy(), token.stop:copy())
+                        advance()
+                    else
+                        args, err = exprlist() if err then return nil, err end
+                        if token.type ~= ")" then
+                            return nil, error.expectedSymbol("')' or ':'", token.type, file, token.start, token.stop)
+                        end
+                        advance()
+                    end
+                    head = Call(head, args, head.start:copy(), args.stop:copy())
+                end
             end
         end
         return head

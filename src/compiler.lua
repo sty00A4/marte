@@ -101,6 +101,14 @@ getString = function(node, file, context, indent)
             local right right, err = getString(node.right, file, context) if err then return nil, err end
             return left.." "..node.op.type.." "..right
         end,
+        ["node.unaryLeft"] = function()
+            local value, err = getString(node.node, file, context) if err then return nil, err end
+            return node.op.type..value
+        end,
+        ["node.unaryRight"] = function()
+            local value, err = getString(node.node, file, context) if err then return nil, err end
+            return value..node.op.type
+        end,
         ["node.exprlist"] = function()
             local str = ""
             for _, n in ipairs(node.nodes) do

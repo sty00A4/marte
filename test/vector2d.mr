@@ -1,5 +1,15 @@
 export meta Vector2(x: number, y: number)
     x = x y = y
+    function abs(self)
+        return Vector2(math.abs(self.x), math.abs(self.y))
+    end
+    function normalized(self)
+        return Vector2(self.x / #self, self.y / #self)
+    end
+    function normalize(self)
+        self = self:normalized()
+    end
+
     metamethod tostring(self)
         return "Vector2("..tostring(self.x)..", "..tostring(self.y)..")"
     end
@@ -19,6 +29,12 @@ export meta Vector2(x: number, y: number)
     metamethod mod(self, other)
         return Vector2(self.x % other.x, self.y % other.y)
     end
+    metamethod pow(self, other)
+        return Vector2(self.x ^ other.x, self.y ^ other.y)
+    end
+    metamethod unm(self)
+        return Vector2(-self.x, -self.y)
+    end
     -- equality
     metamethod eq(self, other)
         return self.x == other.x and self.y == other.y
@@ -33,7 +49,3 @@ export meta Vector2(x: number, y: number)
         return math.sqrt(self.x ^ 2 + self.y ^ 2)
     end
 end
-
-local vec1 = Vector2(1, 2)
-local vec2 = Vector2(3, 3)
-print(#vec1)
