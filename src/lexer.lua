@@ -98,12 +98,16 @@ local function lex(file)
             local start, stop = Position(idx, ln, col), Position(idx, ln, col)
             local symbol = char
             advance()
-            while table.containsStart(symbols, symbol..char) and #char > 0 do
-                symbol = symbol .. char
-                stop = Position(idx, ln, col)
-                advance()
+            if symbol..char == "--" then
+                while char ~= "\n" do advance() end
+            else
+                while table.containsStart(symbols, symbol..char) and #char > 0 do
+                    symbol = symbol .. char
+                    stop = Position(idx, ln, col)
+                    advance()
+                end
+                table.insert(tokens, Token(symbol, nil, start, stop))
             end
-            table.insert(tokens, Token(symbol, nil, start, stop))
         elseif char == '"' or char == "'" then
             local start, stop = Position(idx, ln, col), Position(idx, ln, col)
             local stopChar = char

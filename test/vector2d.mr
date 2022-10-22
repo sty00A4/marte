@@ -1,0 +1,39 @@
+export meta Vector2(x: number, y: number)
+    x = x y = y
+    metamethod tostring(self)
+        return "Vector2("..tostring(self.x)..", "..tostring(self.y)..")"
+    end
+    -- math
+    metamethod add(self, other)
+        return Vector2(self.x + other.x, self.y + other.y)
+    end
+    metamethod sub(self, other)
+        return Vector2(self.x - other.x, self.y - other.y)
+    end
+    metamethod mul(self, other)
+        return Vector2(self.x * other.x, self.y * other.y)
+    end
+    metamethod div(self, other)
+        return Vector2(self.x / other.x, self.y / other.y)
+    end
+    metamethod mod(self, other)
+        return Vector2(self.x % other.x, self.y % other.y)
+    end
+    -- equality
+    metamethod eq(self, other)
+        return self.x == other.x and self.y == other.y
+    end
+    metamethod lt(self, other)
+        return self.x < other.x and self.y < other.y
+    end
+    metamethod le(self, other)
+        return self.x <= other.x and self.y <= other.y
+    end
+    metamethod len(self)
+        return math.sqrt(self.x ^ 2 + self.y ^ 2)
+    end
+end
+
+local vec1 = Vector2(1, 2)
+local vec2 = Vector2(3, 3)
+print(#vec1)

@@ -62,8 +62,19 @@ local function unexpectedScoping(scoping, file, start, stop)
     expect("argument #5", stop, "position")
     return Error("unexpected scoping '"..scoping.."'", file, start, stop)
 end
+---@param name string
+---@param file table
+---@param start table
+---@param stop table
+local function metamethod(name, file, start, stop)
+    expect("argument #1", name, "string")
+    expect("argument #3", file, "file")
+    expect("argument #4", start, "position")
+    expect("argument #5", stop, "position")
+    return Error("'"..name.."' is not a metamethod", file, start, stop)
+end
 
 return {
     Error=Error, unexpectedSymbol=unexpectedSymbol, expectedSymbol=expectedSymbol, expectedNode=expectedNode,
-    unexpectedScoping=unexpectedScoping
+    unexpectedScoping=unexpectedScoping, metamethod=metamethod
 }
