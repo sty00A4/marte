@@ -446,6 +446,7 @@ end
 local function IsDir(path)
     expect("path", path, "string")
     local f = io.open(path, "r")
+    if not f then return false end
     local ok, err, code = f:read("*a")
     f:close()
     return code == 21
@@ -453,7 +454,7 @@ end
 
 local function compileFile(path, target, info)
     local file_ = io.open(path, "r")
-    if not file_ then error("file doesn't exist", 2) end
+    if not file_ then return nil, "file '"..path.."' not found" end
     local text, err, code = file_:read("*a")
     file_:close()
     local file = lexer.File(path, text)

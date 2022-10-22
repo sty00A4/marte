@@ -1,0 +1,102 @@
+export meta Vector2(x: number, y: number)
+    x = x y = y
+    function abs(self)
+        return Vector2(math.abs(self.x), math.abs(self.y))
+    end
+    function normalized(self)
+        return Vector2(self.x / #self, self.y / #self)
+    end
+    function normalize(self)
+        self = self:normalized()
+    end
+
+    metamethod tostring(self)
+        return "Vector2("..tostring(self.x)..", "..tostring(self.y)..")"
+    end
+    -- math
+    metamethod add(self, other)
+        return Vector2(self.x + other.x, self.y + other.y)
+    end
+    metamethod sub(self, other)
+        return Vector2(self.x - other.x, self.y - other.y)
+    end
+    metamethod mul(self, other)
+        return Vector2(self.x * other.x, self.y * other.y)
+    end
+    metamethod div(self, other)
+        return Vector2(self.x / other.x, self.y / other.y)
+    end
+    metamethod mod(self, other)
+        return Vector2(self.x % other.x, self.y % other.y)
+    end
+    metamethod pow(self, other)
+        return Vector2(self.x ^ other.x, self.y ^ other.y)
+    end
+    metamethod unm(self)
+        return Vector2(-self.x, -self.y)
+    end
+    -- equality
+    metamethod eq(self, other)
+        return self.x == other.x and self.y == other.y
+    end
+    metamethod lt(self, other)
+        return self.x < other.x and self.y < other.y
+    end
+    metamethod le(self, other)
+        return self.x <= other.x and self.y <= other.y
+    end
+    metamethod len(self)
+        return math.sqrt(self.x ^ 2 + self.y ^ 2)
+    end
+end
+export meta Vector3(x: number, y: number, z: number)
+    x = x y = y z = z
+    function abs(self)
+        return Vector3(math.abs(self.x), math.abs(self.y), math.abs(self.z))
+    end
+    function normalized(self)
+        return Vector3(self.x / #self, self.y / #self, self.z / #self)
+    end
+    function normalize(self)
+        self = self:normalized()
+    end
+
+    metamethod tostring(self)
+        return "Vector3("..tostring(self.x)..", "..tostring(self.y)..", "..tostring(self.z)..")"
+    end
+    -- math
+    metamethod add(self, other)
+        return Vector3(self.x + other.x, self.y + other.y, self.z + other.z)
+    end
+    metamethod sub(self, other)
+        return Vector3(self.x - other.x, self.y - other.y, self.z - other.z)
+    end
+    metamethod mul(self, other)
+        return Vector3(self.x * other.x, self.y * other.y, self.z * other.z)
+    end
+    metamethod div(self, other)
+        return Vector3(self.x / other.x, self.y / other.y, self.z / other.z)
+    end
+    metamethod mod(self, other)
+        return Vector3(self.x % other.x, self.y % other.y, self.z % other.z)
+    end
+    metamethod pow(self, other)
+        return Vector3(self.x ^ other.x, self.y ^ other.y, self.z ^ other.z)
+    end
+    metamethod unm(self)
+        return Vector3(-self.x, -self.y, -self.z)
+    end
+    -- equality
+    metamethod eq(self, other)
+        return self.x == other.x and self.y == other.y and self.z == other.z
+    end
+    metamethod lt(self, other)
+        return self.x < other.x and self.y < other.y and self.z < other.z
+    end
+    metamethod le(self, other)
+        return self.x <= other.x and self.y <= other.y and self.z <= other.z
+    end
+    metamethod len(self)
+        return math.sqrt(self.x ^ 2 + self.y ^ 2 + self.z ^ 2)
+    end
+end
